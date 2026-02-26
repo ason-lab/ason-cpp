@@ -542,6 +542,29 @@ void test_bad_format_typed_as_vec() {
     PASS();
 }
 
+void test_good_format_single() {
+    // {schema}:(1,Alice) — single struct with one tuple: MUST succeed
+    TEST(good_format_single);
+    FmtRow r;
+    try { r = ason::decode<FmtRow>("{id:int,name:str}:(1,Alice)"); }
+    catch (const std::exception& e) { FAIL(std::string("should accept single struct with one tuple: ") + e.what()); return; }
+    ASSERT_EQ(r.id, 1);
+    ASSERT_EQ(r.name, "Alice");
+    PASS();
+}
+
+void test_good_format_vec_single() {
+    // [{schema}]:(1,Alice) — array schema with one tuple: MUST succeed
+    TEST(good_format_vec_single);
+    std::vector<FmtRow> v;
+    try { v = ason::decode<std::vector<FmtRow>>("[{id:int,name:str}]:(1,Alice)"); }
+    catch (const std::exception& e) { FAIL(std::string("should accept [{schema}]: with single tuple: ") + e.what()); return; }
+    ASSERT_EQ(v.size(), 1u);
+    ASSERT_EQ(v[0].id, 1);
+    ASSERT_EQ(v[0].name, "Alice");
+    PASS();
+}
+
 // ===========================================================================
 // encodePretty -> decode roundtrip tests
 // ===========================================================================
@@ -705,6 +728,8 @@ int main() {
     test_good_format_as_vec();
     test_bad_format_extra_tuples();
     test_bad_format_typed_as_vec();
+    test_good_format_single();
+    test_good_format_vec_single();
 
     std::cout << "\n--- encodePretty -> decode roundtrips ---\n";
     test_pretty_simple_roundtrip();
