@@ -5,6 +5,7 @@ CMakeFiles/
 cmake_install.cmake
 CTestTestfile.cmake
 Makefile
+*_test
 
 # Compiled outputs
 *.o

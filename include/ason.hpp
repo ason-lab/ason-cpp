@@ -280,9 +280,7 @@ inline void append_f64(std::string& buf, double v) {
     }
     // Fast path: 1 decimal place
     double v10 = v * 10.0;
-    double frac10;
-    std::modf(v10, &frac10);
-    frac10 = v10 - std::trunc(v10);
+    double frac10 = v10 - std::trunc(v10);
     if (frac10 == 0.0 && std::abs(v10) < 1e18) {
         auto vi = static_cast<int64_t>(v10);
         if (vi < 0) { buf.push_back('-'); vi = -vi; }
@@ -308,10 +306,20 @@ inline void append_f64(std::string& buf, double v) {
         if (d2 != '0') buf.push_back(d2);
         return;
     }
-    // General: use snprintf for portable formatting
+    // General: use std::to_chars (faster than snprintf)
     char tmp[32];
-    int n = std::snprintf(tmp, sizeof(tmp), "%.17g", v);
-    buf.append(tmp, n);
+    auto [ptr, ec] = std::to_chars(tmp, tmp + sizeof(tmp), v);
+    if (ec == std::errc()) {
+        std::string_view sv(tmp, ptr - tmp);
+        buf.append(sv.data(), sv.size());
+        // Ensure decimal point for float identity
+        if (sv.find('.') == std::string_view::npos && sv.find('e') == std::string_view::npos) {
+            buf.append(".0", 2);
+        }
+    } else {
+        int n = std::snprintf(tmp, sizeof(tmp), "%.17g", v);
+        buf.append(tmp, n);
+    }
 }
 
 // ============================================================================
@@ -566,10 +574,9 @@ inline std::string parse_quoted_string(const char*& pos, const char* end) {
     const char* scan = pos + offset;
 
     if (scan < end && *scan == '"') {
-        // No escapes — zero-copy
-        std::string result(start, scan - start);
+        // No escapes — direct construction (skip ArrayList build)
         pos = scan + 1;
-        return result;
+        return std::string(start, static_cast<size_t>(scan - start));
     }
 
     // Slow path: has escapes
@@ -859,9 +866,8 @@ inline void load_value(const char*& pos, const char* end, double& out) {
     }
     if (pos == start || (pos == start + 1 && *start == '-'))
         throw Error("invalid number");
-    char* endptr = nullptr;
-    out = std::strtod(start, &endptr);
-    if (endptr != pos) throw Error("invalid float");
+    auto [ptr, ec] = std::from_chars(start, pos, out);
+    if (ec != std::errc() || ptr != pos) throw Error("invalid float");
 }
 
 inline void load_value(const char*& pos, const char* end, int8_t& out) {

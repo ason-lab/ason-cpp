@@ -84,6 +84,15 @@ ASON_FIELDS(NestedVec, (matrix, "matrix", "[[int]]"))
 struct StringOnly { std::string val; };
 ASON_FIELDS(StringOnly, (val, "val", "str"))
 
+struct WithBoolVec { std::vector<int64_t> flags; };
+ASON_FIELDS(WithBoolVec, (flags, "flags", "[int]"))
+
+struct WithIntVec { std::vector<int64_t> nums; };
+ASON_FIELDS(WithIntVec, (nums, "nums", "[int]"))
+
+struct WithStrVec { std::vector<std::string> tags; };
+ASON_FIELDS(WithStrVec, (tags, "tags", "[str]"))
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -664,6 +673,78 @@ void test_pretty_deep_nesting_roundtrip() {
 }
 
 // ===========================================================================
+// Typed encoding: primitive vec fields
+// ===========================================================================
+
+void test_encode_typed_bool_vec_field() {
+    TEST(encode_typed_bool_vec_field);
+    WithBoolVec w; w.flags = {1, 0, 1};
+    auto s = ason::encode_typed(w);
+    ASSERT_TRUE(s.find("flags:[int]") != std::string::npos);
+    auto w2 = ason::decode<WithBoolVec>(s);
+    ASSERT_EQ(w2.flags.size(), 3u);
+    ASSERT_EQ(w2.flags[0], 1);
+    ASSERT_EQ(w2.flags[1], 0);
+    ASSERT_EQ(w2.flags[2], 1);
+    PASS();
+}
+
+void test_encode_typed_int_vec_field() {
+    TEST(encode_typed_int_vec_field);
+    WithIntVec w; w.nums = {10, 20, 30};
+    auto s = ason::encode_typed(w);
+    ASSERT_TRUE(s.find("nums:[int]") != std::string::npos);
+    auto w2 = ason::decode<WithIntVec>(s);
+    ASSERT_EQ(w2.nums.size(), 3u);
+    ASSERT_EQ(w2.nums[0], 10);
+    ASSERT_EQ(w2.nums[2], 30);
+    PASS();
+}
+
+void test_encode_typed_str_vec_field() {
+    TEST(encode_typed_str_vec_field);
+    WithStrVec w; w.tags = {"a", "b", "c"};
+    auto s = ason::encode_typed(w);
+    ASSERT_TRUE(s.find("tags:[str]") != std::string::npos);
+    auto w2 = ason::decode<WithStrVec>(s);
+    ASSERT_EQ(w2.tags.size(), 3u);
+    ASSERT_EQ(w2.tags[0], "a");
+    ASSERT_EQ(w2.tags[2], "c");
+    PASS();
+}
+
+void test_encode_typed_empty_int_vec() {
+    TEST(encode_typed_empty_int_vec);
+    WithBoolVec w; w.flags = {};
+    auto s = ason::encode_typed(w);
+    ASSERT_TRUE(s.find("flags:[int]") != std::string::npos);
+    ASSERT_TRUE(s.find("[]") != std::string::npos);
+    PASS();
+}
+
+void test_encode_pretty_typed_int_vec_field() {
+    TEST(encode_pretty_typed_int_vec_field);
+    WithBoolVec w; w.flags = {1, 0};
+    auto s = ason::encode_pretty_typed(w);
+    ASSERT_TRUE(s.find("int") != std::string::npos);
+    auto w2 = ason::decode<WithBoolVec>(s);
+    ASSERT_EQ(w2.flags.size(), 2u);
+    ASSERT_EQ(w2.flags[0], 1);
+    ASSERT_EQ(w2.flags[1], 0);
+    PASS();
+}
+
+void test_decode_field_names_with_underscore() {
+    TEST(decode_field_names_with_underscore);
+    // Decode ASON with underscore in field names
+    auto s = ason::decode<Simple>("{id:int,name:str,active:bool}:(42,Alice,true)");
+    ASSERT_EQ(s.id, 42);
+    ASSERT_EQ(s.name, "Alice");
+    ASSERT_TRUE(s.active);
+    PASS();
+}
+
+// ===========================================================================
 // Main
 // ===========================================================================
 
@@ -739,6 +820,14 @@ int main() {
     test_pretty_optional_roundtrip();
     test_pretty_complex_vec_roundtrip();
     test_pretty_deep_nesting_roundtrip();
+
+    std::cout << "\n--- Typed encoding: primitive vec fields ---\n";
+    test_encode_typed_bool_vec_field();
+    test_encode_typed_int_vec_field();
+    test_encode_typed_str_vec_field();
+    test_encode_typed_empty_int_vec();
+    test_encode_pretty_typed_int_vec_field();
+    test_decode_field_names_with_underscore();
 
     std::cout << "\n=== Results: " << tests_passed << " passed, "
               << tests_failed << " failed ===\n";
