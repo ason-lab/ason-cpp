@@ -4,7 +4,7 @@
 [![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-高性能、仅头文件的 C++17 [ASON](https://github.com/athxx/ason)（Array-Schema Object Notation）序列化/反序列化库 —— 面向 LLM 交互和大规模数据传输的高效序列化格式。SIMD 加速（NEON / SSE2），零拷贝解析，零外部依赖。
+高性能、仅头文件的 C++17 [ASON](https://github.com/ason-lab/ason)（Array-Schema Object Notation）序列化/反序列化库 —— 面向 LLM 交互和大规模数据传输的高效序列化格式。SIMD 加速（NEON / SSE2），零拷贝解析，零外部依赖。
 
 [English](README.md)
 
@@ -454,7 +454,7 @@ ason::load_bin_value(pos, end, payload_view);
 
 ## ASON 格式规范
 
-完整规范见 [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md)，包含语法规则、BNF 语法、转义规则、类型系统和 LLM 集成最佳实践。
+完整规范见 [ASON Spec](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md)，包含语法规则、BNF 语法、转义规则、类型系统和 LLM 集成最佳实践。
 
 ### 语法快速参考
 

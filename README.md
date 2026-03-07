@@ -4,7 +4,7 @@
 [![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A high-performance, header-only C++17 library for [ASON](https://github.com/athxx/ason) (Array-Schema Object Notation) — a token-efficient, schema-driven data format designed for LLM interactions and large-scale data transmission. SIMD-accelerated (NEON / SSE2), zero-copy parsing, zero external dependencies.
+A high-performance, header-only C++17 library for [ASON](https://github.com/ason-lab/ason) (Array-Schema Object Notation) — a token-efficient, schema-driven data format designed for LLM interactions and large-scale data transmission. SIMD-accelerated (NEON / SSE2), zero-copy parsing, zero external dependencies.
 
 [中文文档](README_CN.md)
 
@@ -461,7 +461,7 @@ ason::load_bin_value(pos, end, payload_view);
 
 ## ASON Format Specification
 
-See the full [ASON Spec](https://github.com/athxx/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
+See the full [ASON Spec](https://github.com/ason-lab/ason/blob/main/docs/ASON_SPEC_CN.md) for syntax rules, BNF grammar, escape rules, type system, and LLM integration best practices.
 
 ### Syntax Quick Reference
 
