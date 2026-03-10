@@ -259,7 +259,7 @@ inline void append_u64(std::string& buf, uint64_t v) {
 inline void append_i64(std::string& buf, int64_t v) {
     if (v < 0) {
         buf.push_back('-');
-        append_u64(buf, static_cast<uint64_t>(-v));
+        append_u64(buf, 0ULL - static_cast<uint64_t>(v));
     } else {
         append_u64(buf, static_cast<uint64_t>(v));
     }
@@ -835,12 +835,15 @@ inline void load_value(const char*& pos, const char* end, int64_t& out) {
     if (pos < end && *pos == '-') { neg = true; pos++; }
     uint64_t val = 0;
     int digits = 0;
+    uint64_t limit = neg ? static_cast<uint64_t>(INT64_MAX) + 1 : static_cast<uint64_t>(INT64_MAX);
     while (pos < end && *pos >= '0' && *pos <= '9') {
-        val = val * 10 + (*pos - '0');
+        int d = *pos - '0';
+        if (val > (limit - d) / 10) throw Error("invalid number");
+        val = val * 10 + d;
         pos++; digits++;
     }
     if (digits == 0) throw Error("invalid number");
-    out = neg ? -static_cast<int64_t>(val) : static_cast<int64_t>(val);
+    out = neg ? 0ULL - val : val;
 }
 
 inline void load_value(const char*& pos, const char* end, uint64_t& out) {
@@ -848,7 +851,9 @@ inline void load_value(const char*& pos, const char* end, uint64_t& out) {
     uint64_t val = 0;
     int digits = 0;
     while (pos < end && *pos >= '0' && *pos <= '9') {
-        val = val * 10 + (*pos - '0');
+        int d = *pos - '0';
+        if (val > (UINT64_MAX - d) / 10) throw Error("invalid number");
+        val = val * 10 + d;
         pos++; digits++;
     }
     if (digits == 0) throw Error("invalid number");

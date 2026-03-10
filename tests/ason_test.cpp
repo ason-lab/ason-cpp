@@ -744,6 +744,31 @@ void test_decode_field_names_with_underscore() {
     PASS();
 }
 
+void test_int64_min_encode() {
+    TEST(int64_min_encode);
+    Simple s{-9223372036854775807LL - 1, "MinInt", true};
+    auto str = ason::encode(s);
+    auto s2 = ason::decode<Simple>(str);
+    ASSERT_EQ(s2.id, -9223372036854775807LL - 1);
+    PASS();
+}
+
+void test_large_integer_rejection() {
+    TEST(large_integer_rejection);
+    bool caught1 = false;
+    try {
+        ason::decode<Simple>("{id,name,active}:(999999999999999999999999999,X,true)");
+    } catch (const ason::Error&) { caught1 = true; }
+    ASSERT_TRUE(caught1);
+
+    bool caught2 = false;
+    try {
+        ason::decode<Simple>("{id,name,active}:(-99999999999999999999999999,X,true)");
+    } catch (const ason::Error&) { caught2 = true; }
+    ASSERT_TRUE(caught2);
+    PASS();
+}
+
 // ===========================================================================
 // Main
 // ===========================================================================
@@ -789,6 +814,8 @@ int main() {
     test_integer_valued_float();
     test_negative_numbers();
     test_large_unsigned();
+    test_int64_min_encode();
+    test_large_integer_rejection();
 
     std::cout << "\n--- Parsing features ---\n";
     test_bool_values();
