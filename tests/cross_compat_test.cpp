@@ -107,6 +107,19 @@ ASON_FIELDS(SrcWithOpt, (id,"id","int"),(label,"label","str"),(score_opt,"score"
 struct DstFewerOpt { int64_t id=0; std::optional<std::string> label; };
 ASON_FIELDS(DstFewerOpt, (id,"id","int"),(label,"label","str"))
 
+// Matrix P1/P2/N4
+struct MatrixPart { int64_t id=0; double score=0; };
+ASON_FIELDS(MatrixPart, (id,"id","int"),(score,"score","float"))
+
+struct MatrixNoOverlap { int64_t foo=0; std::string bar; };
+ASON_FIELDS(MatrixNoOverlap, (foo,"foo","int"),(bar,"bar","str"))
+
+struct MatrixNestedOpt { std::string name; std::optional<std::string> nick; };
+ASON_FIELDS(MatrixNestedOpt, (name,"name","str"),(nick,"nick","str"))
+
+struct MatrixUserNestedOpt { int64_t id=0; MatrixNestedOpt profile; };
+ASON_FIELDS(MatrixUserNestedOpt, (id,"id","int"),(profile,"profile","{name:str,nick:str}"))
+
 // Dim 10: special string
 struct SrcSpecialStr { int64_t id=0; std::string name; std::string bio; };
 ASON_FIELDS(SrcSpecialStr, (id,"id","int"),(name,"name","str"),(bio,"bio","str"))
@@ -611,6 +624,64 @@ void test_cross_zero_value() {
     PASS();
 }
 
+void test_matrix_partial_overlap_typed() {
+    TEST(matrix_partial_overlap_typed);
+    auto dst = ason::decode<MatrixPart>("{id:int,name:str,score:float,active:bool}:(42,Alice,9.5,true)");
+    ASSERT_EQ(dst.id, 42);
+    ASSERT_NEAR(dst.score, 9.5, 1e-10);
+    PASS();
+}
+
+void test_matrix_partial_overlap_untyped() {
+    TEST(matrix_partial_overlap_untyped);
+    auto dst = ason::decode<MatrixPart>("{id,name,score,active}:(42,Alice,9.5,true)");
+    ASSERT_EQ(dst.id, 42);
+    ASSERT_NEAR(dst.score, 9.5, 1e-10);
+    PASS();
+}
+
+void test_matrix_no_overlap_typed() {
+    TEST(matrix_no_overlap_typed);
+    auto dst = ason::decode<MatrixNoOverlap>("{id:int,name:str}:(42,Alice)");
+    ASSERT_EQ(dst.foo, 0);
+    ASSERT_EQ(dst.bar, "");
+    PASS();
+}
+
+void test_matrix_no_overlap_untyped() {
+    TEST(matrix_no_overlap_untyped);
+    auto dst = ason::decode<MatrixNoOverlap>("{id,name}:(42,Alice)");
+    ASSERT_EQ(dst.foo, 0);
+    ASSERT_EQ(dst.bar, "");
+    PASS();
+}
+
+void test_matrix_nested_optional_typed() {
+    TEST(matrix_nested_optional_typed);
+    auto dst = ason::decode<std::vector<MatrixUserNestedOpt>>(
+        "[{id:int,profile:{name:str,nick:str?,score:float?},active:bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
+    ASSERT_EQ(dst.size(), 2u);
+    ASSERT_EQ(dst[0].id, 1);
+    ASSERT_EQ(dst[0].profile.name, "Alice");
+    ASSERT_TRUE(dst[0].profile.nick.has_value());
+    ASSERT_EQ(*dst[0].profile.nick, "ally");
+    ASSERT_EQ(dst[1].id, 2);
+    ASSERT_EQ(dst[1].profile.name, "Bob");
+    ASSERT_FALSE(dst[1].profile.nick.has_value());
+    PASS();
+}
+
+void test_matrix_nested_optional_untyped() {
+    TEST(matrix_nested_optional_untyped);
+    auto dst = ason::decode<std::vector<MatrixUserNestedOpt>>(
+        "[{id,profile:{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
+    ASSERT_EQ(dst.size(), 2u);
+    ASSERT_TRUE(dst[0].profile.nick.has_value());
+    ASSERT_EQ(*dst[0].profile.nick, "ally");
+    ASSERT_FALSE(dst[1].profile.nick.has_value());
+    PASS();
+}
+
 int main() {
     std::cout << "=== ASON C++ Cross-Compat Test Suite ===\n\n";
 
@@ -650,6 +721,12 @@ int main() {
     test_cross_many_rows();
     test_cross_typed_subset_reorder();
     test_cross_zero_value();
+    test_matrix_partial_overlap_typed();
+    test_matrix_partial_overlap_untyped();
+    test_matrix_no_overlap_typed();
+    test_matrix_no_overlap_untyped();
+    test_matrix_nested_optional_typed();
+    test_matrix_nested_optional_untyped();
 
     std::cout << "\n=== Results: " << tests_passed << " passed, "
               << tests_failed << " failed ===\n";
