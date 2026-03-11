@@ -27,7 +27,7 @@ struct WithMap {
   std::string name;
   std::unordered_map<std::string, int64_t> attrs;
 };
-ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "map[str,int]"))
+ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "<str:int>"))
 
 struct Address {
   std::string city;
@@ -246,7 +246,7 @@ ASON_FIELDS(
      "{host:str,port:int,max_connections:int,ssl:bool,timeout_ms:float}"),
     (cache, "cache", "{enabled:bool,ttl_seconds:int,max_size_mb:int}"),
     (log, "log", "{level:str,file:str,rotate:bool}"),
-    (features, "features", "[str]"), (env, "env", "map[str,str]"))
+    (features, "features", "[str]"), (env, "env", "<str:str>"))
 
 // ===========================================================================
 // Helper: print struct
@@ -320,7 +320,7 @@ int main() {
 
   // 3. Map/Dict field
   std::cout << "\n3. Map/Dict field:\n";
-  auto wm = ason::decode<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
+  auto wm = ason::decode<WithMap>("{name,attrs}:(Alice,<age:30,score:95>)");
   std::cout << "   name=" << wm.name << ", attrs={";
   for (auto &[k, v] : wm.attrs)
     std::cout << k << ":" << v << " ";

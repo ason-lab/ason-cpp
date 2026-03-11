@@ -103,13 +103,16 @@ inline size_t find_quote_or_special(const uint8_t* ptr, size_t len) {
 
 // Check if any byte in s needs quoting (control chars, structural chars)
 inline bool has_special_chars(const uint8_t* ptr, size_t len) {
-    // Structural: , ( ) [ ] " \ and control < 0x20
+    // Structural: , ( ) [ ] < > : " \ and control < 0x20
     size_t i = 0;
     uint8x16_t vcomma = vdupq_n_u8(',');
     uint8x16_t vlp    = vdupq_n_u8('(');
     uint8x16_t vrp    = vdupq_n_u8(')');
     uint8x16_t vlb    = vdupq_n_u8('[');
     uint8x16_t vrb    = vdupq_n_u8(']');
+    uint8x16_t vla    = vdupq_n_u8('<');
+    uint8x16_t vra    = vdupq_n_u8('>');
+    uint8x16_t vcolon = vdupq_n_u8(':');
     uint8x16_t vquote = vdupq_n_u8('"');
     uint8x16_t vbslash= vdupq_n_u8('\\');
     uint8x16_t vctrl  = vdupq_n_u8(0x1F);
@@ -121,6 +124,9 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         r = vorrq_u8(r, vceqq_u8(chunk, vrp));
         r = vorrq_u8(r, vceqq_u8(chunk, vlb));
         r = vorrq_u8(r, vceqq_u8(chunk, vrb));
+        r = vorrq_u8(r, vceqq_u8(chunk, vla));
+        r = vorrq_u8(r, vceqq_u8(chunk, vra));
+        r = vorrq_u8(r, vceqq_u8(chunk, vcolon));
         r = vorrq_u8(r, vceqq_u8(chunk, vquote));
         r = vorrq_u8(r, vceqq_u8(chunk, vbslash));
         if (movemask(r)) return true;
@@ -128,7 +134,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -166,6 +172,9 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     __m128i vrp     = _mm_set1_epi8(')');
     __m128i vlb     = _mm_set1_epi8('[');
     __m128i vrb     = _mm_set1_epi8(']');
+    __m128i vla     = _mm_set1_epi8('<');
+    __m128i vra     = _mm_set1_epi8('>');
+    __m128i vcolon  = _mm_set1_epi8(':');
     __m128i vquote  = _mm_set1_epi8('"');
     __m128i vbslash = _mm_set1_epi8('\\');
     __m128i vctrl   = _mm_set1_epi8(0x1F);
@@ -178,6 +187,9 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrp));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vlb));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrb));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vla));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vra));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vcolon));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vquote));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vbslash));
         if (_mm_movemask_epi8(r)) return true;
@@ -185,7 +197,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -205,7 +217,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (size_t i = 0; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -501,18 +513,16 @@ void dump_value(std::string& buf, const std::optional<T>& v) {
 
 template <typename K, typename V>
 void dump_value(std::string& buf, const std::unordered_map<K, V>& m) {
-    buf.push_back('[');
+    buf.push_back('<');
     bool first = true;
     for (auto& [k, v] : m) {
-        if (!first) buf.push_back(',');
+        if (!first) { buf.push_back(','); buf.push_back(' '); }
         first = false;
-        buf.push_back('(');
         dump_value(buf, k);
-        buf.push_back(',');
+        buf.push_back(':');
         dump_value(buf, v);
-        buf.push_back(')');
     }
-    buf.push_back(']');
+    buf.push_back('>');
 }
 
 // Struct dump — requires AsonFields specialization
@@ -555,11 +565,11 @@ inline void skip_whitespace_and_comments(const char*& pos, const char* end) {
 inline bool at_value_end(const char* pos, const char* end) {
     if (pos >= end) return true;
     char c = *pos;
-    return c == ',' || c == ')' || c == ']';
+    return c == ',' || c == ')' || c == ']' || c == '>' || c == ':';
 }
 
 inline bool is_delim(char c) {
-    return c == ',' || c == ')' || c == ']' || c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    return c == ',' || c == ')' || c == ']' || c == '>' || c == ':' || c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
 // Parse quoted string — handles escape sequences; zero-copy when no escapes
@@ -635,7 +645,7 @@ inline std::string parse_plain_value(const char*& pos, const char* end) {
     bool has_escape = false;
     while (pos < end) {
         char b = *pos;
-        if (b == ',' || b == ')' || b == ']') break;
+        if (b == ',' || b == ')' || b == ']' || b == '>' || b == ':') break;
         if (b == '\\') { has_escape = true; pos += 2; continue; }
         pos++;
     }
@@ -737,20 +747,17 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
         if (pos < end && *pos == ':') {
             pos++;
             skip_whitespace(pos, end);
-            if (pos < end && *pos == '{') {
-                // Nested struct schema — skip balanced braces
-                int depth = 0;
+            if (pos < end && (*pos == '{' || *pos == '[' || *pos == '<')) {
+                std::vector<char> stack;
                 while (pos < end) {
-                    if (*pos == '{') depth++;
-                    else if (*pos == '}') { depth--; if (depth == 0) { pos++; break; } }
-                    pos++;
-                }
-            } else if (pos < end && *pos == '[') {
-                // Array type annotation — skip balanced brackets
-                int depth = 0;
-                while (pos < end) {
-                    if (*pos == '[') depth++;
-                    else if (*pos == ']') { depth--; if (depth == 0) { pos++; break; } }
+                    char ch = *pos;
+                    if (ch == '{') stack.push_back('}');
+                    else if (ch == '[') stack.push_back(']');
+                    else if (ch == '<') stack.push_back('>');
+                    else if (!stack.empty() && ch == stack.back()) {
+                        stack.pop_back();
+                        if (stack.empty()) { pos++; break; }
+                    }
                     pos++;
                 }
             } else if (pos + 3 <= end && pos[0] == 'm' && pos[1] == 'a' && pos[2] == 'p') {
@@ -794,8 +801,9 @@ inline void skip_value(const char*& pos, const char* end) {
         case '"': pos++; while (pos < end) { if (*pos == '"') { pos++; return; } if (*pos == '\\') pos++; pos++; } break;
         case '(': skip_balanced(pos, end, '(', ')'); break;
         case '[': skip_balanced(pos, end, '[', ']'); break;
+        case '<': skip_balanced(pos, end, '<', '>'); break;
         default:
-            while (pos < end) { char b = *pos; if (b == ',' || b == ')' || b == ']') return; pos++; }
+            while (pos < end) { char b = *pos; if (b == ',' || b == ')' || b == ']' || b == '>' || b == ':') return; pos++; }
             break;
     }
 }
@@ -945,29 +953,26 @@ void load_value(const char*& pos, const char* end, std::optional<T>& out) {
 template <typename K, typename V>
 void load_value(const char*& pos, const char* end, std::unordered_map<K, V>& out) {
     detail::skip_whitespace_and_comments(pos, end);
-    if (pos >= end || *pos != '[') throw Error("expected '['");
+    if (pos >= end || *pos != '<') throw Error("expected '<'");
     pos++;
     out.clear();
     bool first = true;
     for (;;) {
         detail::skip_whitespace_and_comments(pos, end);
-        if (pos >= end || *pos == ']') { pos++; break; }
+        if (pos >= end || *pos == '>') { pos++; break; }
         if (!first) {
             if (*pos == ',') {
                 pos++;
                 detail::skip_whitespace_and_comments(pos, end);
-                if (pos < end && *pos == ']') { pos++; break; }
+                if (pos < end && *pos == '>') { pos++; break; }
             } else break;
         }
         first = false;
-        if (pos >= end || *pos != '(') throw Error("expected '(' in map entry");
-        pos++;
         K key; load_value(pos, end, key);
         detail::skip_whitespace_and_comments(pos, end);
-        if (pos < end && *pos == ',') pos++;
+        if (pos >= end || *pos != ':') throw Error("expected ':' in map entry");
+        pos++;
         V val; load_value(pos, end, val);
-        detail::skip_whitespace_and_comments(pos, end);
-        if (pos < end && *pos == ')') pos++;
         out[std::move(key)] = std::move(val);
     }
 }
@@ -1188,6 +1193,9 @@ template <typename T> struct is_vector : std::false_type {};
 template <typename T> struct is_vector<std::vector<T>> : std::true_type {};
 template <typename T> struct is_optional : std::false_type {};
 template <typename T> struct is_optional<std::optional<T>> : std::true_type {};
+template <typename T> struct is_unordered_map : std::false_type {};
+template <typename K, typename V, typename H, typename E, typename A>
+struct is_unordered_map<std::unordered_map<K, V, H, E, A>> : std::true_type {};
 
 // write_field_schema: recursively write schema annotation for a field type.
 // Struct fields get :{f1,f2,...}, vector<struct> fields get :[{f1,f2,...}],
@@ -1212,6 +1220,19 @@ inline void write_field_schema(std::string& buf, bool typed) {
             auto tn = TypeName<Elem>::value;
             if (tn) { buf.push_back(':'); buf.push_back('['); buf.append(tn); buf.push_back(']'); }
         }
+    } else if constexpr (is_unordered_map<T>::value) {
+        if (typed) {
+            auto key_tn = TypeName<typename T::key_type>::value;
+            auto val_tn = TypeName<typename T::mapped_type>::value;
+            if (key_tn && val_tn) {
+                buf.push_back(':');
+                buf.push_back('<');
+                buf.append(key_tn);
+                buf.push_back(':');
+                buf.append(val_tn);
+                buf.push_back('>');
+            }
+        }
     } else if constexpr (is_optional<T>::value) {
         using Inner = typename T::value_type;
         if constexpr (AsonFields<Inner>::defined) {
@@ -1219,6 +1240,19 @@ inline void write_field_schema(std::string& buf, bool typed) {
             buf.push_back('{');
             AsonFields<Inner>::write_schema(buf, typed);
             buf.push_back('}');
+        } else if constexpr (is_unordered_map<Inner>::value) {
+            if (typed) {
+                auto key_tn = TypeName<typename Inner::key_type>::value;
+                auto val_tn = TypeName<typename Inner::mapped_type>::value;
+                if (key_tn && val_tn) {
+                    buf.push_back(':');
+                    buf.push_back('<');
+                    buf.append(key_tn);
+                    buf.push_back(':');
+                    buf.append(val_tn);
+                    buf.push_back('>');
+                }
+            }
         } else if (typed) {
             auto tn = TypeName<Inner>::value;
             if (tn) { buf.push_back(':'); buf.append(tn); }
@@ -1325,8 +1359,8 @@ inline std::vector<int> build_match_table(const std::string& src) {
         }
         switch (src[i]) {
             case '"': in_quote = true; break;
-            case '{': case '(': case '[': stk.push_back(i); break;
-            case '}': case ')': case ']':
+            case '{': case '(': case '[': case '<': stk.push_back(i); break;
+            case '}': case ')': case ']': case '>':
                 if (!stk.empty()) {
                     int j = stk.back(); stk.pop_back();
                     mat[j] = i; mat[i] = j;
@@ -1369,8 +1403,8 @@ struct PrettyFmt {
             }
             switch (ch) {
                 case '"': inq = true; out.push_back(ch); break;
-                case '{': case '(': case '[': d++; out.push_back(ch); break;
-                case '}': case ')': case ']': d--; out.push_back(ch); break;
+                case '{': case '(': case '[': case '<': d++; out.push_back(ch); break;
+                case '}': case ')': case ']': case '>': d--; out.push_back(ch); break;
                 case ',': out.push_back(','); if (d == 1) out.push_back(' '); break;
                 default: out.push_back(ch); break;
             }
@@ -1380,7 +1414,7 @@ struct PrettyFmt {
     void write_value() {
         while (pos < (int)src.size()) {
             char ch = src[pos];
-            if (ch == ',' || ch == ')' || ch == '}' || ch == ']') break;
+            if (ch == ',' || ch == ')' || ch == '}' || ch == ']' || ch == '>') break;
             if (ch == '"') write_quoted(); else { out.push_back(ch); pos++; }
         }
     }
@@ -1397,7 +1431,7 @@ struct PrettyFmt {
     void write_group() {
         if (pos >= (int)src.size()) return;
         char ch = src[pos];
-        if (ch != '{' && ch != '(' && ch != '[') { write_value(); return; }
+        if (ch != '{' && ch != '(' && ch != '[' && ch != '<') { write_value(); return; }
 
         // Special case: [{...}] array schema — fuse brackets
         if (ch == '[' && pos + 1 < (int)src.size() && src[pos + 1] == '{') {

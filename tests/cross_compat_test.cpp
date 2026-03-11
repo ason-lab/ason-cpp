@@ -147,7 +147,7 @@ ASON_FIELDS(DstEmptyThin, (id,"id","int"))
 
 // Dim 16: map
 struct SrcWithMap { int64_t id=0; std::string name; std::unordered_map<std::string,int64_t> meta; };
-ASON_FIELDS(SrcWithMap, (id,"id","int"),(name,"name","str"),(meta,"meta","map[str,int]"))
+ASON_FIELDS(SrcWithMap, (id,"id","int"),(name,"name","str"),(meta,"meta","<str:int>"))
 
 struct DstNoMap { int64_t id=0; std::string name; };
 ASON_FIELDS(DstNoMap, (id,"id","int"),(name,"name","str"))
@@ -540,7 +540,7 @@ void test_cross_vec_single_row() {
 
 void test_cross_ason_syntax_string() {
     TEST(ason_syntax_string);
-    SrcAsonLike src{1, "{a,b}:(1,2)", "[(x,y),(z,w)]"};
+    SrcAsonLike src{1, "{a,b}:(1,2)", "<x:y,z:w>"};
     auto data = ason::encode(src);
     auto dst = ason::decode<DstNoStr>(data);
     ASSERT_EQ(dst.id, 1);

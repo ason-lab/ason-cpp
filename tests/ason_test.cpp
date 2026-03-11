@@ -56,7 +56,18 @@ struct WithMap {
     std::string name;
     std::unordered_map<std::string, int64_t> attrs;
 };
-ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "map[str,int]"))
+ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "<str:int>"))
+
+struct Person {
+    std::string name;
+    int64_t age = 0;
+};
+ASON_FIELDS(Person, (name, "name", "str"), (age, "age", "int"))
+
+struct WithComplexMap {
+    std::unordered_map<std::string, std::vector<Person>> groups;
+};
+ASON_FIELDS(WithComplexMap, (groups, "groups", "<str:[{name:str,age:int}]>"))
 
 struct Floats { double a = 0; double b = 0; float c = 0; };
 ASON_FIELDS(Floats, (a, "a", "float"), (b, "b", "float"), (c, "c", "float"))
@@ -219,7 +230,7 @@ void test_nested_roundtrip() {
 
 void test_map_field() {
     TEST(map_field);
-    auto r = ason::decode<WithMap>("{name,attrs}:(Alice,[(age,30),(score,95)])");
+    auto r = ason::decode<WithMap>("{name,attrs}:(Alice,<age:30,score:95>)");
     ASSERT_EQ(r.name, "Alice");
     ASSERT_EQ(r.attrs.size(), 2u);
     ASSERT_EQ(r.attrs.at("age"), 30);
@@ -235,6 +246,66 @@ void test_map_roundtrip() {
     ASSERT_EQ(m2.name, "Bob");
     ASSERT_EQ(m2.attrs.at("x"), 1);
     ASSERT_EQ(m2.attrs.at("y"), 2);
+    PASS();
+}
+
+void test_typed_map_roundtrip() {
+    TEST(typed_map_roundtrip);
+    WithMap m{"Cara", {{"age", 30}, {"score", 95}}};
+    auto s = ason::encode_typed(m);
+    ASSERT_TRUE(s.find("attrs:<str:int>") != std::string::npos);
+    auto m2 = ason::decode<WithMap>(s);
+    ASSERT_EQ(m2.name, "Cara");
+    ASSERT_EQ(m2.attrs.at("age"), 30);
+    ASSERT_EQ(m2.attrs.at("score"), 95);
+    PASS();
+}
+
+void test_decode_typed_map_schema() {
+    TEST(decode_typed_map_schema);
+    auto r = ason::decode<WithMap>("{name:str,attrs:<str:int>}:(Dana,<age:41,score:88>)");
+    ASSERT_EQ(r.name, "Dana");
+    ASSERT_EQ(r.attrs.size(), 2u);
+    ASSERT_EQ(r.attrs.at("age"), 41);
+    ASSERT_EQ(r.attrs.at("score"), 88);
+    PASS();
+}
+
+void test_complex_map_roundtrip() {
+    TEST(complex_map_roundtrip);
+    WithComplexMap src{
+        {
+            {"teamA", {{"Alice", 30}, {"Bob", 28}}},
+            {"teamB", {{"Carol", 41}}}
+        }
+    };
+    auto s = ason::encode(src);
+    auto out = ason::decode<WithComplexMap>(s);
+    ASSERT_EQ(out.groups.size(), 2u);
+    ASSERT_EQ(out.groups.at("teamA").size(), 2u);
+    ASSERT_EQ(out.groups.at("teamA")[0].name, "Alice");
+    ASSERT_EQ(out.groups.at("teamA")[0].age, 30);
+    ASSERT_EQ(out.groups.at("teamA")[1].name, "Bob");
+    ASSERT_EQ(out.groups.at("teamA")[1].age, 28);
+    ASSERT_EQ(out.groups.at("teamB").size(), 1u);
+    ASSERT_EQ(out.groups.at("teamB")[0].name, "Carol");
+    ASSERT_EQ(out.groups.at("teamB")[0].age, 41);
+    PASS();
+}
+
+void test_decode_typed_complex_map_schema() {
+    TEST(decode_typed_complex_map_schema);
+    auto r = ason::decode<WithComplexMap>(
+        "{groups:<str:[{name:str,age:int}]>}:(<teamA:[(Alice,30),(Bob,28)],teamB:[(Carol,41)]>)");
+    ASSERT_EQ(r.groups.size(), 2u);
+    ASSERT_EQ(r.groups.at("teamA").size(), 2u);
+    ASSERT_EQ(r.groups.at("teamA")[0].name, "Alice");
+    ASSERT_EQ(r.groups.at("teamA")[0].age, 30);
+    ASSERT_EQ(r.groups.at("teamA")[1].name, "Bob");
+    ASSERT_EQ(r.groups.at("teamA")[1].age, 28);
+    ASSERT_EQ(r.groups.at("teamB").size(), 1u);
+    ASSERT_EQ(r.groups.at("teamB")[0].name, "Carol");
+    ASSERT_EQ(r.groups.at("teamB")[0].age, 41);
     PASS();
 }
 
@@ -647,6 +718,18 @@ void test_pretty_optional_roundtrip() {
     PASS();
 }
 
+void test_pretty_typed_map_roundtrip() {
+    TEST(pretty_typed_map_roundtrip);
+    WithMap m{"Eve", {{"x", 7}, {"y", 9}}};
+    auto pretty = ason::encode_pretty_typed(m);
+    ASSERT_TRUE(pretty.find("attrs:<str:int>") != std::string::npos);
+    auto m2 = ason::decode<WithMap>(pretty);
+    ASSERT_EQ(m2.name, "Eve");
+    ASSERT_EQ(m2.attrs.at("x"), 7);
+    ASSERT_EQ(m2.attrs.at("y"), 9);
+    PASS();
+}
+
 void test_pretty_complex_vec_roundtrip() {
     TEST(pretty_complex_vec_roundtrip);
     std::vector<Score2> scores = {{1,95.5,"excellent"},{2,72.3,"good"},{3,40.0,"fail"}};
@@ -794,6 +877,10 @@ int main() {
     test_nested_vec();
     test_map_field();
     test_map_roundtrip();
+    test_typed_map_roundtrip();
+    test_decode_typed_map_schema();
+    test_complex_map_roundtrip();
+    test_decode_typed_complex_map_schema();
 
     std::cout << "\n--- Nested structs ---\n";
     test_nested_struct();
@@ -845,6 +932,7 @@ int main() {
     test_pretty_vec_roundtrip();
     test_pretty_nested_roundtrip();
     test_pretty_optional_roundtrip();
+    test_pretty_typed_map_roundtrip();
     test_pretty_complex_vec_roundtrip();
     test_pretty_deep_nesting_roundtrip();
 
