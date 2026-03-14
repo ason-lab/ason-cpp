@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include <iomanip>
 #include "ason.hpp"
 
@@ -29,6 +30,11 @@ inline void append_str(std::string& buf, const std::string& s) {
 }
 
 inline void append_i64(std::string& buf, int64_t v) {
+    char tmp[24]; auto [p,e] = std::to_chars(tmp, tmp+24, v);
+    buf.append(tmp, p - tmp);
+}
+
+inline void append_u64(std::string& buf, uint64_t v) {
     char tmp[24]; auto [p,e] = std::to_chars(tmp, tmp+24, v);
     buf.append(tmp, p - tmp);
 }
@@ -73,11 +79,26 @@ inline int64_t read_i64(const char*& p, const char* e) {
     p = ptr; return v;
 }
 
+inline uint64_t read_u64(const char*& p, const char* e) {
+    skip_ws(p, e);
+    uint64_t v; auto [ptr, ec] = std::from_chars(p, e, v);
+    p = ptr; return v;
+}
+
 inline double read_f64(const char*& p, const char* e) {
     skip_ws(p, e);
     char* endptr = nullptr;
     double v = std::strtod(p, &endptr);
     p = endptr; return v;
+}
+
+inline bool read_null(const char*& p, const char* e) {
+    skip_ws(p, e);
+    if (p + 4 <= e && std::memcmp(p, "null", 4) == 0) {
+        p += 4;
+        return true;
+    }
+    return false;
 }
 
 inline bool read_bool(const char*& p, const char* e) {
@@ -89,6 +110,11 @@ inline bool read_bool(const char*& p, const char* e) {
 inline void skip_comma(const char*& p, const char* e) {
     skip_ws(p, e);
     if (p < e && *p == ',') p++;
+}
+
+inline void skip_key(const char*& p, const char* e) {
+    (void)read_str(p, e);
+    expect(p, e, ':');
 }
 
 } // namespace json_mini
@@ -152,8 +178,8 @@ ASON_FIELDS(AllTypes,
     (s,        "s",        "str"),
     (opt_some, "opt_some", "int"),
     (opt_none, "opt_none", "int"),
-    (vec_int,  "vec_int",  "[int]"),
-    (vec_str,  "vec_str",  "[str]"))
+    (vec_int,  "vec_int",  "@[int]"),
+    (vec_str,  "vec_str",  "@[str]"))
 
 struct Task {
     int64_t id = 0;
@@ -179,7 +205,7 @@ ASON_FIELDS(Project,
     (name,   "name",   "str"),
     (budget, "budget", "float"),
     (active, "active", "bool"),
-    (tasks,  "tasks",  "[{id:int,title:str,priority:int,done:bool,hours:float}]"))
+    (tasks,  "tasks",  "@[{id@int,title@str,priority@int,done@bool,hours@float}]"))
 
 struct Team {
     std::string name;
@@ -191,7 +217,7 @@ ASON_FIELDS(Team,
     (name,     "name",     "str"),
     (lead,     "lead",     "str"),
     (size,     "size",     "int"),
-    (projects, "projects", "[{name:str,budget:float,active:bool,tasks}]"))
+    (projects, "projects", "@[{name@str,budget@float,active@bool,tasks}]"))
 
 struct Division {
     std::string name;
@@ -203,7 +229,7 @@ ASON_FIELDS(Division,
     (name,      "name",      "str"),
     (location,  "location",  "str"),
     (headcount, "headcount", "int"),
-    (teams,     "teams",     "[{name:str,lead:str,size:int,projects}]"))
+    (teams,     "teams",     "@[{name@str,lead@str,size@int,projects}]"))
 
 struct Company {
     std::string name;
@@ -218,8 +244,8 @@ ASON_FIELDS(Company,
     (founded,    "founded",    "int"),
     (revenue_m,  "revenue_m",  "float"),
     (is_public,  "public",     "bool"),
-    (divisions,  "divisions",  "[{name:str,location:str,headcount:int,teams}]"),
-    (tags,       "tags",       "[str]"))
+    (divisions,  "divisions",  "@[{name@str,location@str,headcount@int,teams}]"),
+    (tags,       "tags",       "@[str]"))
 
 // ===========================================================================
 // Data generators
@@ -372,6 +398,128 @@ std::vector<User> json_deserialize_users(const std::string& s) {
     return users;
 }
 
+void json_serialize_alltypes_item(std::string& buf, const AllTypes& item) {
+    buf.push_back('{');
+    buf.append("\"b\":"); buf.append(item.b ? "true" : "false"); buf.push_back(',');
+    buf.append("\"i8v\":"); json_mini::append_i64(buf, item.i8v); buf.push_back(',');
+    buf.append("\"i16v\":"); json_mini::append_i64(buf, item.i16v); buf.push_back(',');
+    buf.append("\"i32v\":"); json_mini::append_i64(buf, item.i32v); buf.push_back(',');
+    buf.append("\"i64v\":"); json_mini::append_i64(buf, item.i64v); buf.push_back(',');
+    buf.append("\"u8v\":"); json_mini::append_u64(buf, item.u8v); buf.push_back(',');
+    buf.append("\"u16v\":"); json_mini::append_u64(buf, item.u16v); buf.push_back(',');
+    buf.append("\"u32v\":"); json_mini::append_u64(buf, item.u32v); buf.push_back(',');
+    buf.append("\"u64v\":"); json_mini::append_u64(buf, item.u64v); buf.push_back(',');
+    buf.append("\"f32v\":"); json_mini::append_f64(buf, item.f32v); buf.push_back(',');
+    buf.append("\"f64v\":"); json_mini::append_f64(buf, item.f64v); buf.push_back(',');
+    buf.append("\"s\":"); json_mini::append_str(buf, item.s); buf.push_back(',');
+    buf.append("\"opt_some\":");
+    if (item.opt_some.has_value()) json_mini::append_i64(buf, *item.opt_some);
+    else buf.append("null");
+    buf.push_back(',');
+    buf.append("\"opt_none\":");
+    if (item.opt_none.has_value()) json_mini::append_i64(buf, *item.opt_none);
+    else buf.append("null");
+    buf.push_back(',');
+    buf.append("\"vec_int\":[");
+    for (size_t i = 0; i < item.vec_int.size(); i++) {
+        if (i > 0) buf.push_back(',');
+        json_mini::append_i64(buf, item.vec_int[i]);
+    }
+    buf.push_back(']');
+    buf.push_back(',');
+    buf.append("\"vec_str\":[");
+    for (size_t i = 0; i < item.vec_str.size(); i++) {
+        if (i > 0) buf.push_back(',');
+        json_mini::append_str(buf, item.vec_str[i]);
+    }
+    buf.append("]}");
+}
+
+std::string json_serialize_alltypes(const std::vector<AllTypes>& items) {
+    std::string buf;
+    buf.reserve(items.size() * 256);
+    buf.push_back('[');
+    for (size_t i = 0; i < items.size(); i++) {
+        if (i > 0) buf.push_back(',');
+        json_serialize_alltypes_item(buf, items[i]);
+    }
+    buf.push_back(']');
+    return buf;
+}
+
+std::vector<int64_t> json_read_i64_array(const char*& p, const char* e) {
+    using namespace json_mini;
+    std::vector<int64_t> out;
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!out.empty()) skip_comma(p, e);
+        out.push_back(read_i64(p, e));
+    }
+    expect(p, e, ']');
+    return out;
+}
+
+std::vector<std::string> json_read_str_array(const char*& p, const char* e) {
+    using namespace json_mini;
+    std::vector<std::string> out;
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!out.empty()) skip_comma(p, e);
+        out.push_back(read_str(p, e));
+    }
+    expect(p, e, ']');
+    return out;
+}
+
+AllTypes json_deserialize_alltypes(const char*& p, const char* e) {
+    using namespace json_mini;
+    AllTypes item;
+    expect(p, e, '{');
+    skip_key(p, e); item.b = read_bool(p, e); skip_comma(p, e);
+    skip_key(p, e); item.i8v = static_cast<int8_t>(read_i64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.i16v = static_cast<int16_t>(read_i64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.i32v = static_cast<int32_t>(read_i64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.i64v = read_i64(p, e); skip_comma(p, e);
+    skip_key(p, e); item.u8v = static_cast<uint8_t>(read_u64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.u16v = static_cast<uint16_t>(read_u64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.u32v = static_cast<uint32_t>(read_u64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.u64v = read_u64(p, e); skip_comma(p, e);
+    skip_key(p, e); item.f32v = static_cast<float>(read_f64(p, e)); skip_comma(p, e);
+    skip_key(p, e); item.f64v = read_f64(p, e); skip_comma(p, e);
+    skip_key(p, e); item.s = read_str(p, e); skip_comma(p, e);
+    skip_key(p, e);
+    if (read_null(p, e)) item.opt_some = std::nullopt;
+    else item.opt_some = read_i64(p, e);
+    skip_comma(p, e);
+    skip_key(p, e);
+    if (read_null(p, e)) item.opt_none = std::nullopt;
+    else item.opt_none = read_i64(p, e);
+    skip_comma(p, e);
+    skip_key(p, e); item.vec_int = json_read_i64_array(p, e); skip_comma(p, e);
+    skip_key(p, e); item.vec_str = json_read_str_array(p, e);
+    expect(p, e, '}');
+    return item;
+}
+
+std::vector<AllTypes> json_deserialize_alltypes_vec(const std::string& s) {
+    const char* p = s.data();
+    const char* e = p + s.size();
+    using namespace json_mini;
+    std::vector<AllTypes> items;
+    expect(p, e, '[');
+    while (true) {
+        skip_ws(p, e);
+        if (p >= e || *p == ']') break;
+        if (!items.empty()) skip_comma(p, e);
+        items.push_back(json_deserialize_alltypes(p, e));
+    }
+    return items;
+}
+
 // ===========================================================================
 // JSON deep struct deserializers (for fair comparison)
 // ===========================================================================
@@ -513,28 +661,41 @@ struct BenchResult {
     size_t ason_bytes = 0;
     size_t ason_bin_bytes = 0;
 
+    static std::string format_ratio(double ratio) {
+        long tenths = static_cast<long>(ratio * 10.0 + 0.5);
+        if (tenths % 10 == 0) return std::to_string(tenths / 10) + "x";
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%.1f", tenths / 10.0);
+        return std::string(buf) + "x";
+    }
+
+    static std::string format_percent(double percent) {
+        long pct = static_cast<long>(percent + 0.5);
+        return std::to_string(pct) + "%";
+    }
+
     void print() const {
-        double ser_ratio = json_ser_ms / ason_ser_ms;
-        double de_ratio = json_de_ms / ason_de_ms;
+        double ason_ser_ratio = json_ser_ms / ason_ser_ms;
         double bin_ser_ratio = json_ser_ms / ason_bin_ser_ms;
+        double ason_de_ratio = json_de_ms / ason_de_ms;
         double bin_de_ratio = json_de_ms / ason_bin_de_ms;
-        double saving = (1.0 - (double)ason_bytes / (double)json_bytes) * 100.0;
-        double bin_saving = (1.0 - (double)ason_bin_bytes / (double)json_bytes) * 100.0;
+        double ason_percent = ((double)ason_bytes / (double)json_bytes) * 100.0;
+        double bin_percent = ((double)ason_bin_bytes / (double)json_bytes) * 100.0;
 
         std::cout << "  " << name << "\n";
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "    Serialize:   JSON " << std::setw(8) << json_ser_ms
                   << "ms | ASON " << std::setw(8) << ason_ser_ms
-                  << "ms | BIN " << std::setw(8) << ason_bin_ser_ms
-                  << "ms | ratio " << bin_ser_ratio << "x\n";
+                  << "ms (" << format_ratio(ason_ser_ratio) << ") | BIN " << std::setw(8) << ason_bin_ser_ms
+                  << "ms (" << format_ratio(bin_ser_ratio) << ")\n";
         std::cout << "    Deserialize: JSON " << std::setw(8) << json_de_ms
                   << "ms | ASON " << std::setw(8) << ason_de_ms
-                  << "ms | BIN " << std::setw(8) << ason_bin_de_ms
-                  << "ms | ratio " << bin_de_ratio << "x\n";
+                  << "ms (" << format_ratio(ason_de_ratio) << ") | BIN " << std::setw(8) << ason_bin_de_ms
+                  << "ms (" << format_ratio(bin_de_ratio) << ")\n";
         std::cout << "    Size:        JSON " << std::setw(8) << json_bytes
                   << " B | ASON " << std::setw(8) << ason_bytes
-                  << " B | BIN " << std::setw(8) << ason_bin_bytes
-                  << " B | saving " << std::setprecision(0) << bin_saving << "%\n";
+                  << " B (" << format_percent(ason_percent) << ") | BIN " << std::setw(8) << ason_bin_bytes
+                  << " B (" << format_percent(bin_percent) << ")\n";
     }
 };
 
@@ -610,85 +771,62 @@ BenchResult bench_flat(size_t count, int iterations) {
 BenchResult bench_all_types(size_t count, int iterations) {
     auto items = generate_all_types(count);
 
-    // JSON: serialize as individual objects
+    // JSON: serialize full 16-field payload
     std::string json_str;
     auto t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        json_str.clear();
-        json_str.push_back('[');
-        for (size_t i = 0; i < items.size(); i++) {
-            if (i > 0) json_str.push_back(',');
-            json_str.push_back('{');
-            json_str.append("\"b\":"); json_str.append(items[i].b ? "true" : "false"); json_str.push_back(',');
-            json_str.append("\"i8v\":"); json_mini::append_i64(json_str, items[i].i8v); json_str.push_back(',');
-            json_str.append("\"i16v\":"); json_mini::append_i64(json_str, items[i].i16v); json_str.push_back(',');
-            json_str.append("\"i32v\":"); json_mini::append_i64(json_str, items[i].i32v); json_str.push_back(',');
-            json_str.append("\"i64v\":"); json_mini::append_i64(json_str, items[i].i64v); json_str.push_back(',');
-            json_str.append("\"u8v\":"); json_mini::append_i64(json_str, items[i].u8v); json_str.push_back(',');
-            json_str.append("\"u16v\":"); json_mini::append_i64(json_str, items[i].u16v); json_str.push_back(',');
-            json_str.append("\"u32v\":"); json_mini::append_i64(json_str, items[i].u32v); json_str.push_back(',');
-            json_str.append("\"u64v\":"); json_mini::append_i64(json_str, (int64_t)items[i].u64v); json_str.push_back(',');
-            json_str.append("\"f32v\":"); json_mini::append_f64(json_str, items[i].f32v); json_str.push_back(',');
-            json_str.append("\"f64v\":"); json_mini::append_f64(json_str, items[i].f64v); json_str.push_back(',');
-            json_str.append("\"s\":"); json_mini::append_str(json_str, items[i].s);
-            json_str.push_back('}');
-        }
-        json_str.push_back(']');
+        json_str = json_serialize_alltypes(items);
     }
     double json_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON serialize individually
-    std::vector<std::string> ason_strs;
+    // ASON serialize as one schema-driven vector payload
+    std::string ason_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_strs.clear();
-        ason_strs.reserve(items.size());
-        for (auto& item : items) ason_strs.push_back(ason::encode(item));
+        ason_str = ason::encode(items);
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN serialize individually
-    std::vector<std::string> ason_bin_strs;
+    // ASON-BIN serialize as one vector payload
+    std::string ason_bin_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_bin_strs.clear();
-        ason_bin_strs.reserve(items.size());
-        for (auto& item : items) ason_bin_strs.push_back(ason::encode_bin(item));
+        ason_bin_str = ason::encode_bin(items);
     }
     double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // JSON deserialize: skip (mini JSON doesn't support AllTypes)
-    double json_de = json_ser * 1.5; // estimate
+    // JSON deserialize
+    t0 = Clock::now();
+    for (int iter = 0; iter < iterations; iter++) {
+        auto r = json_deserialize_alltypes_vec(json_str);
+        assert(r.size() == count);
+    }
+    double json_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // ASON deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        for (auto& s : ason_strs) {
-            auto r = ason::decode<AllTypes>(s);
-            (void)r;
-        }
+        auto r = ason::decode<std::vector<AllTypes>>(ason_str);
+        assert(r.size() == count);
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // ASON-BIN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        for (auto& s : ason_bin_strs) {
-            auto r = ason::decode_bin<AllTypes>(s);
-            (void)r;
-        }
+        auto r = ason::decode_bin<std::vector<AllTypes>>(ason_bin_str);
+        assert(r.size() == count);
     }
     double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    size_t ason_total = 0;
-    for (auto& s : ason_strs) ason_total += s.size();
-    size_t ason_bin_total = 0;
-    for (auto& s : ason_bin_strs) ason_bin_total += s.size();
+    auto decoded = ason::decode<std::vector<AllTypes>>(ason_str);
+    assert(decoded.size() == count);
+    assert(decoded[0].vec_int.size() == items[0].vec_int.size());
 
     return BenchResult{
-        "All-types struct × " + std::to_string(count) + " (16 fields, per-struct)",
+        "All-types struct × " + std::to_string(count) + " (16 fields, vec)",
         json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
-        json_str.size(), ason_total, ason_bin_total
+        json_str.size(), ason_str.size(), ason_bin_str.size()
     };
 }
 
@@ -761,23 +899,19 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double json_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON serialize
-    std::vector<std::string> ason_strs;
+    // ASON serialize as one schema-driven vector payload
+    std::string ason_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_strs.clear();
-        ason_strs.reserve(companies.size());
-        for (auto& c : companies) ason_strs.push_back(ason::encode(c));
+        ason_str = ason::encode(companies);
     }
     double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN serialize
-    std::vector<std::string> ason_bin_strs;
+    // ASON-BIN serialize as one vector payload
+    std::string ason_bin_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_bin_strs.clear();
-        ason_bin_strs.reserve(companies.size());
-        for (auto& c : companies) ason_bin_strs.push_back(ason::encode_bin(c));
+        ason_bin_str = ason::encode_bin(companies);
     }
     double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
@@ -792,38 +926,31 @@ BenchResult bench_deep(size_t count, int iterations) {
     // ASON deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        for (auto& s : ason_strs) {
-            auto c = ason::decode<Company>(s);
-            (void)c;
-        }
+        auto r = ason::decode<std::vector<Company>>(ason_str);
+        assert(r.size() == count);
     }
     double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // ASON-BIN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        for (auto& s : ason_bin_strs) {
-            auto c = ason::decode_bin<Company>(s);
-            (void)c;
-        }
+        auto r = ason::decode_bin<std::vector<Company>>(ason_bin_str);
+        assert(r.size() == count);
     }
     double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // Verify
-    for (size_t i = 0; i < ason_strs.size(); i++) {
-        auto c2 = ason::decode<Company>(ason_strs[i]);
+    auto roundtrip = ason::decode<std::vector<Company>>(ason_str);
+    assert(roundtrip.size() == companies.size());
+    for (size_t i = 0; i < roundtrip.size(); i++) {
+        auto& c2 = roundtrip[i];
         assert(c2.name == companies[i].name);
     }
-
-    size_t ason_total = 0;
-    for (auto& s : ason_strs) ason_total += s.size();
-    size_t ason_bin_total = 0;
-    for (auto& s : ason_bin_strs) ason_bin_total += s.size();
 
     return BenchResult{
         "5-level deep × " + std::to_string(count) + " (Company>Division>Team>Project>Task)",
         json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
-        json_str.size(), ason_total, ason_bin_total
+        json_str.size(), ason_str.size(), ason_bin_str.size()
     };
 }
 

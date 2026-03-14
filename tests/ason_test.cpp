@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cassert>
 #include <cmath>
-#include <unordered_map>
 #include "ason.hpp"
 
 static int tests_passed = 0;
@@ -44,19 +43,25 @@ ASON_FIELDS(WithOptional,
     (id, "id", "int"), (label, "label", "str"), (count, "count", "int"))
 
 struct WithVec { std::string name; std::vector<int64_t> nums; };
-ASON_FIELDS(WithVec, (name, "name", "str"), (nums, "nums", "[int]"))
+ASON_FIELDS(WithVec, (name, "name", "str"), (nums, "nums", "@[int]"))
 
 struct Inner { std::string val; int64_t n = 0; };
 ASON_FIELDS(Inner, (val, "val", "str"), (n, "n", "int"))
 
 struct Outer { std::string label; Inner inner; };
-ASON_FIELDS(Outer, (label, "label", "str"), (inner, "inner", "{val:str,n:int}"))
+ASON_FIELDS(Outer, (label, "label", "str"), (inner, "inner", "@{val@str,n@int}"))
 
-struct WithMap {
-    std::string name;
-    std::unordered_map<std::string, int64_t> attrs;
+struct AttrEntry {
+    std::string key;
+    int64_t value = 0;
 };
-ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "<str:int>"))
+ASON_FIELDS(AttrEntry, (key, "key", "str"), (value, "value", "int"))
+
+struct WithEntries {
+    std::string name;
+    std::vector<AttrEntry> attrs;
+};
+ASON_FIELDS(WithEntries, (name, "name", "str"), (attrs, "attrs", "@[{key@str,value@int}]"))
 
 struct Person {
     std::string name;
@@ -64,10 +69,16 @@ struct Person {
 };
 ASON_FIELDS(Person, (name, "name", "str"), (age, "age", "int"))
 
-struct WithComplexMap {
-    std::unordered_map<std::string, std::vector<Person>> groups;
+struct GroupEntry {
+    std::string key;
+    std::vector<Person> value;
 };
-ASON_FIELDS(WithComplexMap, (groups, "groups", "<str:[{name:str,age:int}]>"))
+ASON_FIELDS(GroupEntry, (key, "key", "str"), (value, "value", "@[{name@str,age@int}]"))
+
+struct WithGroupEntries {
+    std::vector<GroupEntry> groups;
+};
+ASON_FIELDS(WithGroupEntries, (groups, "groups", "@[{key@str,value@[{name@str,age@int}]}]"))
 
 struct Floats { double a = 0; double b = 0; float c = 0; };
 ASON_FIELDS(Floats, (a, "a", "float"), (b, "b", "float"), (c, "c", "float"))
@@ -84,25 +95,39 @@ struct DeepA { std::string name; int64_t val = 0; };
 ASON_FIELDS(DeepA, (name, "name", "str"), (val, "val", "int"))
 
 struct DeepB { std::string label; std::vector<DeepA> items; };
-ASON_FIELDS(DeepB, (label, "label", "str"), (items, "items", "[{name:str,val:int}]"))
+ASON_FIELDS(DeepB, (label, "label", "str"), (items, "items", "@[{name@str,val@int}]"))
 
 struct DeepC { std::string title; std::vector<DeepB> groups; };
-ASON_FIELDS(DeepC, (title, "title", "str"), (groups, "groups", "[{label:str,items}]"))
+ASON_FIELDS(DeepC, (title, "title", "str"), (groups, "groups", "@[{label@str,items}]"))
 
 struct NestedVec { std::vector<std::vector<int64_t>> matrix; };
-ASON_FIELDS(NestedVec, (matrix, "matrix", "[[int]]"))
+ASON_FIELDS(NestedVec, (matrix, "matrix", "@[[int]]"))
 
 struct StringOnly { std::string val; };
 ASON_FIELDS(StringOnly, (val, "val", "str"))
 
 struct WithBoolVec { std::vector<int64_t> flags; };
-ASON_FIELDS(WithBoolVec, (flags, "flags", "[int]"))
+ASON_FIELDS(WithBoolVec, (flags, "flags", "@[int]"))
 
 struct WithIntVec { std::vector<int64_t> nums; };
-ASON_FIELDS(WithIntVec, (nums, "nums", "[int]"))
+ASON_FIELDS(WithIntVec, (nums, "nums", "@[int]"))
 
 struct WithStrVec { std::vector<std::string> tags; };
-ASON_FIELDS(WithStrVec, (tags, "tags", "[str]"))
+ASON_FIELDS(WithStrVec, (tags, "tags", "@[str]"))
+
+static const AttrEntry* find_attr(const std::vector<AttrEntry>& attrs, const std::string& key) {
+    for (const auto& entry : attrs) {
+        if (entry.key == key) return &entry;
+    }
+    return nullptr;
+}
+
+static const GroupEntry* find_group(const std::vector<GroupEntry>& groups, const std::string& key) {
+    for (const auto& entry : groups) {
+        if (entry.key == key) return &entry;
+    }
+    return nullptr;
+}
 
 // ===========================================================================
 // Tests
@@ -123,7 +148,7 @@ void test_typed_roundtrip() {
     TEST(typed_roundtrip);
     Simple s{1, "Bob", false};
     auto str = ason::encode_typed(s);
-    ASSERT_TRUE(str.find("id:int") != std::string::npos);
+    ASSERT_TRUE(str.find("id@int") != std::string::npos);
     auto s2 = ason::decode<Simple>(str);
     ASSERT_EQ(s2.id, 1);
     ASSERT_EQ(s2.name, "Bob");
@@ -147,7 +172,7 @@ void test_vec_typed_roundtrip() {
     TEST(vec_typed_roundtrip);
     std::vector<Simple> vec = {{1,"A",true}};
     auto str = ason::encode_typed(vec);
-    ASSERT_TRUE(str.find("id:int") != std::string::npos);
+    ASSERT_TRUE(str.find("id@int") != std::string::npos);
     auto vec2 = ason::decode<std::vector<Simple>>(str);
     ASSERT_EQ(vec2.size(), 1u);
     ASSERT_EQ(vec2[0].name, "A");
@@ -210,7 +235,7 @@ void test_empty_vec() {
 
 void test_nested_struct() {
     TEST(nested_struct);
-    auto r = ason::decode<Outer>("{label,inner:{val,n}}:(hello,(world,42))");
+    auto r = ason::decode<Outer>("{label,inner@{val,n}}:(hello,(world,42))");
     ASSERT_EQ(r.label, "hello");
     ASSERT_EQ(r.inner.val, "world");
     ASSERT_EQ(r.inner.n, 42);
@@ -228,84 +253,139 @@ void test_nested_roundtrip() {
     PASS();
 }
 
-void test_map_field() {
-    TEST(map_field);
-    auto r = ason::decode<WithMap>("{name,attrs}:(Alice,<age:30,score:95>)");
+void test_entry_field() {
+    TEST(entry_field);
+    auto r = ason::decode<WithEntries>("{name,attrs@[{key,value}]}:(Alice,[(age,30),(score,95)])");
     ASSERT_EQ(r.name, "Alice");
     ASSERT_EQ(r.attrs.size(), 2u);
-    ASSERT_EQ(r.attrs.at("age"), 30);
-    ASSERT_EQ(r.attrs.at("score"), 95);
+    auto age = find_attr(r.attrs, "age");
+    auto score = find_attr(r.attrs, "score");
+    ASSERT_TRUE(age != nullptr);
+    ASSERT_TRUE(score != nullptr);
+    ASSERT_EQ(age->value, 30);
+    ASSERT_EQ(score->value, 95);
     PASS();
 }
 
-void test_map_roundtrip() {
-    TEST(map_roundtrip);
-    WithMap m{"Bob", {{"x", 1}, {"y", 2}}};
+void test_entry_roundtrip() {
+    TEST(entry_roundtrip);
+    WithEntries m{"Bob", {{"x", 1}, {"y", 2}}};
     auto s = ason::encode(m);
-    auto m2 = ason::decode<WithMap>(s);
+    auto m2 = ason::decode<WithEntries>(s);
     ASSERT_EQ(m2.name, "Bob");
-    ASSERT_EQ(m2.attrs.at("x"), 1);
-    ASSERT_EQ(m2.attrs.at("y"), 2);
+    auto x = find_attr(m2.attrs, "x");
+    auto y = find_attr(m2.attrs, "y");
+    ASSERT_TRUE(x != nullptr);
+    ASSERT_TRUE(y != nullptr);
+    ASSERT_EQ(x->value, 1);
+    ASSERT_EQ(y->value, 2);
     PASS();
 }
 
-void test_typed_map_roundtrip() {
-    TEST(typed_map_roundtrip);
-    WithMap m{"Cara", {{"age", 30}, {"score", 95}}};
+void test_typed_entry_roundtrip() {
+    TEST(typed_entry_roundtrip);
+    WithEntries m{"Cara", {{"age", 30}, {"score", 95}}};
     auto s = ason::encode_typed(m);
-    ASSERT_TRUE(s.find("attrs:<str:int>") != std::string::npos);
-    auto m2 = ason::decode<WithMap>(s);
+    ASSERT_TRUE(s.find("attrs@[{key@str,value@int}]") != std::string::npos);
+    auto m2 = ason::decode<WithEntries>(s);
     ASSERT_EQ(m2.name, "Cara");
-    ASSERT_EQ(m2.attrs.at("age"), 30);
-    ASSERT_EQ(m2.attrs.at("score"), 95);
+    auto age = find_attr(m2.attrs, "age");
+    auto score = find_attr(m2.attrs, "score");
+    ASSERT_TRUE(age != nullptr);
+    ASSERT_TRUE(score != nullptr);
+    ASSERT_EQ(age->value, 30);
+    ASSERT_EQ(score->value, 95);
     PASS();
 }
 
-void test_decode_typed_map_schema() {
-    TEST(decode_typed_map_schema);
-    auto r = ason::decode<WithMap>("{name:str,attrs:<str:int>}:(Dana,<age:41,score:88>)");
+void test_decode_typed_entry_schema() {
+    TEST(decode_typed_entry_schema);
+    auto r = ason::decode<WithEntries>("{name@str,attrs@[{key@str,value@int}]}:(Dana,[(age,41),(score,88)])");
     ASSERT_EQ(r.name, "Dana");
     ASSERT_EQ(r.attrs.size(), 2u);
-    ASSERT_EQ(r.attrs.at("age"), 41);
-    ASSERT_EQ(r.attrs.at("score"), 88);
+    auto age = find_attr(r.attrs, "age");
+    auto score = find_attr(r.attrs, "score");
+    ASSERT_TRUE(age != nullptr);
+    ASSERT_TRUE(score != nullptr);
+    ASSERT_EQ(age->value, 41);
+    ASSERT_EQ(score->value, 88);
     PASS();
 }
 
-void test_complex_map_roundtrip() {
-    TEST(complex_map_roundtrip);
-    WithComplexMap src{
-        {
-            {"teamA", {{"Alice", 30}, {"Bob", 28}}},
-            {"teamB", {{"Carol", 41}}}
-        }
-    };
+void test_complex_entry_roundtrip() {
+    TEST(complex_entry_roundtrip);
+    WithGroupEntries src{{{"teamA", {{"Alice", 30}, {"Bob", 28}}},
+                          {"teamB", {{"Carol", 41}}}}};
     auto s = ason::encode(src);
-    auto out = ason::decode<WithComplexMap>(s);
+    auto out = ason::decode<WithGroupEntries>(s);
     ASSERT_EQ(out.groups.size(), 2u);
-    ASSERT_EQ(out.groups.at("teamA").size(), 2u);
-    ASSERT_EQ(out.groups.at("teamA")[0].name, "Alice");
-    ASSERT_EQ(out.groups.at("teamA")[0].age, 30);
-    ASSERT_EQ(out.groups.at("teamA")[1].name, "Bob");
-    ASSERT_EQ(out.groups.at("teamA")[1].age, 28);
-    ASSERT_EQ(out.groups.at("teamB").size(), 1u);
-    ASSERT_EQ(out.groups.at("teamB")[0].name, "Carol");
-    ASSERT_EQ(out.groups.at("teamB")[0].age, 41);
+    auto team_a = find_group(out.groups, "teamA");
+    auto team_b = find_group(out.groups, "teamB");
+    ASSERT_TRUE(team_a != nullptr);
+    ASSERT_TRUE(team_b != nullptr);
+    ASSERT_EQ(team_a->value.size(), 2u);
+    ASSERT_EQ(team_a->value[0].name, "Alice");
+    ASSERT_EQ(team_a->value[0].age, 30);
+    ASSERT_EQ(team_a->value[1].name, "Bob");
+    ASSERT_EQ(team_a->value[1].age, 28);
+    ASSERT_EQ(team_b->value.size(), 1u);
+    ASSERT_EQ(team_b->value[0].name, "Carol");
+    ASSERT_EQ(team_b->value[0].age, 41);
     PASS();
 }
 
-void test_decode_typed_complex_map_schema() {
-    TEST(decode_typed_complex_map_schema);
-    auto r = ason::decode<WithComplexMap>(
-        "{groups:<str:[{name:str,age:int}]>}:(<teamA:[(Alice,30),(Bob,28)],teamB:[(Carol,41)]>)");
+void test_decode_typed_complex_entry_schema() {
+    TEST(decode_typed_complex_entry_schema);
+    auto r = ason::decode<WithGroupEntries>(
+        "{groups@[{key@str,value@[{name@str,age@int}]}]}:([(teamA,[(Alice,30),(Bob,28)]),(teamB,[(Carol,41)])])");
     ASSERT_EQ(r.groups.size(), 2u);
-    ASSERT_EQ(r.groups.at("teamA").size(), 2u);
-    ASSERT_EQ(r.groups.at("teamA")[0].name, "Alice");
-    ASSERT_EQ(r.groups.at("teamA")[0].age, 30);
-    ASSERT_EQ(r.groups.at("teamA")[1].name, "Bob");
-    ASSERT_EQ(r.groups.at("teamA")[1].age, 28);
-    ASSERT_EQ(r.groups.at("teamB").size(), 1u);
-    ASSERT_EQ(r.groups.at("teamB")[0].name, "Carol");
-    ASSERT_EQ(r.groups.at("teamB")[0].age, 41);
+    auto team_a = find_group(r.groups, "teamA");
+    auto team_b = find_group(r.groups, "teamB");
+    ASSERT_TRUE(team_a != nullptr);
+    ASSERT_TRUE(team_b != nullptr);
+    ASSERT_EQ(team_a->value.size(), 2u);
+    ASSERT_EQ(team_a->value[0].name, "Alice");
+    ASSERT_EQ(team_a->value[0].age, 30);
+    ASSERT_EQ(team_a->value[1].name, "Bob");
+    ASSERT_EQ(team_a->value[1].age, 28);
+    ASSERT_EQ(team_b->value.size(), 1u);
+    ASSERT_EQ(team_b->value[0].name, "Carol");
+    ASSERT_EQ(team_b->value[0].age, 41);
+    PASS();
+}
+
+void test_pretty_typed_complex_entry_roundtrip() {
+    TEST(pretty_typed_complex_entry_roundtrip);
+    WithGroupEntries in{{{"teamA", {{"Alice", 30}, {"Bob", 28}}},
+                         {"teamB", {{"Carol", 41}}}}};
+    auto pretty = ason::encode_pretty_typed(in);
+    ASSERT_TRUE(pretty.find("groups@[{key@str,value@[{name@str,age@int}]}]") != std::string::npos);
+    auto out = ason::decode<WithGroupEntries>(pretty);
+    ASSERT_EQ(out.groups.size(), 2u);
+    auto team_a = find_group(out.groups, "teamA");
+    auto team_b = find_group(out.groups, "teamB");
+    ASSERT_TRUE(team_a != nullptr);
+    ASSERT_TRUE(team_b != nullptr);
+    ASSERT_EQ(team_a->value.size(), 2u);
+    ASSERT_EQ(team_a->value[0].name, "Alice");
+    ASSERT_EQ(team_b->value[0].age, 41);
+    PASS();
+}
+
+void test_binary_complex_entry_roundtrip() {
+    TEST(binary_complex_entry_roundtrip);
+    WithGroupEntries in{{{"teamA", {{"Alice", 30}, {"Bob", 28}}},
+                         {"teamB", {{"Carol", 41}}}}};
+    auto bin = ason::encode_bin(in);
+    auto out = ason::decode_bin<WithGroupEntries>(bin);
+    ASSERT_EQ(out.groups.size(), 2u);
+    auto team_a = find_group(out.groups, "teamA");
+    auto team_b = find_group(out.groups, "teamB");
+    ASSERT_TRUE(team_a != nullptr);
+    ASSERT_TRUE(team_b != nullptr);
+    ASSERT_EQ(team_a->value.size(), 2u);
+    ASSERT_EQ(team_a->value[0].name, "Alice");
+    ASSERT_EQ(team_b->value[0].age, 41);
     PASS();
 }
 
@@ -454,7 +534,7 @@ void test_multiline() {
 void test_typed_schema_parse() {
     TEST(typed_schema_parse);
     auto r = ason::decode<Simple>(
-        "{id:int,name:str,active:bool}:(42,Hello,false)");
+        "{id@int,name@str,active@bool}:(42,Hello,false)");
     ASSERT_EQ(r.id, 42);
     ASSERT_EQ(r.name, "Hello");
     ASSERT_FALSE(r.active);
@@ -563,9 +643,9 @@ void test_backslash_escape() {
 // Format validation tests — {schema}: is INVALID for vec; [{schema}]: required
 // ===========================================================================
 
-static const char* BAD_FMT = "{id:int,name:str}:\n  (1,Alice),\n  (2,Bob),\n  (3,Carol)";
-static const char* GOOD_FMT = "[{id:int,name:str}]:\n  (1,Alice),\n  (2,Bob),\n  (3,Carol)";
-static const char* BAD_FMT2 = "{id:int,name:str}:(1,Alice)";  // single, then trailing
+static const char* BAD_FMT = "{id@int,name@str}:\n  (1,Alice),\n  (2,Bob),\n  (3,Carol)";
+static const char* GOOD_FMT = "[{id@int,name@str}]:\n  (1,Alice),\n  (2,Bob),\n  (3,Carol)";
+static const char* BAD_FMT2 = "{id@int,name@str}:(1,Alice)";  // single, then trailing
 
 struct FmtRow { int64_t id = 0; std::string name; };
 ASON_FIELDS(FmtRow, (id, "id", "int"), (name, "name", "str"))
@@ -604,7 +684,7 @@ void test_good_format_as_vec() {
 void test_bad_format_extra_tuples() {
     // Multiple structures encoded without vec syntax
     TEST(bad_format_extra_tuples);
-    const char* bad = "{id:int,name:str}:(10,Dave),(11,Eve)";
+    const char* bad = "{id@int,name@str}:(10,Dave),(11,Eve)";
     bool threw = false;
     try { ason::decode<FmtRow>(bad); }
     catch (const std::exception&) { threw = true; }
@@ -616,7 +696,7 @@ void test_bad_format_typed_as_vec() {
     // Even with typed annotations but missing []: wrapper
     TEST(bad_format_typed_as_vec);
     bool threw = false;
-    try { ason::decode<std::vector<FmtRow>>("{id:int,name:str}:(1,A),(2,B)"); }
+    try { ason::decode<std::vector<FmtRow>>("{id@int,name@str}:(1,A),(2,B)"); }
     catch (const std::exception&) { threw = true; }
     if (!threw) { FAIL("should reject {typed_schema}: for vector decode"); return; }
     PASS();
@@ -626,7 +706,7 @@ void test_good_format_single() {
     // {schema}:(1,Alice) — single struct with one tuple: MUST succeed
     TEST(good_format_single);
     FmtRow r;
-    try { r = ason::decode<FmtRow>("{id:int,name:str}:(1,Alice)"); }
+    try { r = ason::decode<FmtRow>("{id@int,name@str}:(1,Alice)"); }
     catch (const std::exception& e) { FAIL(std::string("should accept single struct with one tuple: ") + e.what()); return; }
     ASSERT_EQ(r.id, 1);
     ASSERT_EQ(r.name, "Alice");
@@ -637,7 +717,7 @@ void test_good_format_vec_single() {
     // [{schema}]:(1,Alice) — array schema with one tuple: MUST succeed
     TEST(good_format_vec_single);
     std::vector<FmtRow> v;
-    try { v = ason::decode<std::vector<FmtRow>>("[{id:int,name:str}]:(1,Alice)"); }
+    try { v = ason::decode<std::vector<FmtRow>>("[{id@int,name@str}]:(1,Alice)"); }
     catch (const std::exception& e) { FAIL(std::string("should accept [{schema}]: with single tuple: ") + e.what()); return; }
     ASSERT_EQ(v.size(), 1u);
     ASSERT_EQ(v[0].id, 1);
@@ -657,7 +737,7 @@ struct Team {
     std::vector<int64_t> scores;
     bool active = false;
 };
-ASON_FIELDS(Team, (name, "name", "str"), (scores, "scores", "[int]"), (active, "active", "bool"))
+ASON_FIELDS(Team, (name, "name", "str"), (scores, "scores", "@[int]"), (active, "active", "bool"))
 
 void test_pretty_simple_roundtrip() {
     TEST(pretty_simple_roundtrip);
@@ -674,7 +754,7 @@ void test_pretty_typed_roundtrip() {
     TEST(pretty_typed_roundtrip);
     Simple s{99, "Zara", false};
     auto pretty = ason::encode_pretty_typed(s);
-    ASSERT_TRUE(pretty.find("id:int") != std::string::npos);
+    ASSERT_TRUE(pretty.find("id@int") != std::string::npos);
     auto s2 = ason::decode<Simple>(pretty);
     ASSERT_EQ(s2.id, 99);
     ASSERT_EQ(s2.name, "Zara");
@@ -718,15 +798,19 @@ void test_pretty_optional_roundtrip() {
     PASS();
 }
 
-void test_pretty_typed_map_roundtrip() {
-    TEST(pretty_typed_map_roundtrip);
-    WithMap m{"Eve", {{"x", 7}, {"y", 9}}};
+void test_pretty_typed_entry_roundtrip() {
+    TEST(pretty_typed_entry_roundtrip);
+    WithEntries m{"Eve", {{"x", 7}, {"y", 9}}};
     auto pretty = ason::encode_pretty_typed(m);
-    ASSERT_TRUE(pretty.find("attrs:<str:int>") != std::string::npos);
-    auto m2 = ason::decode<WithMap>(pretty);
+    ASSERT_TRUE(pretty.find("attrs@[{key@str,value@int}]") != std::string::npos);
+    auto m2 = ason::decode<WithEntries>(pretty);
     ASSERT_EQ(m2.name, "Eve");
-    ASSERT_EQ(m2.attrs.at("x"), 7);
-    ASSERT_EQ(m2.attrs.at("y"), 9);
+    auto x = find_attr(m2.attrs, "x");
+    auto y = find_attr(m2.attrs, "y");
+    ASSERT_TRUE(x != nullptr);
+    ASSERT_TRUE(y != nullptr);
+    ASSERT_EQ(x->value, 7);
+    ASSERT_EQ(y->value, 9);
     PASS();
 }
 
@@ -763,7 +847,7 @@ void test_encode_typed_bool_vec_field() {
     TEST(encode_typed_bool_vec_field);
     WithBoolVec w; w.flags = {1, 0, 1};
     auto s = ason::encode_typed(w);
-    ASSERT_TRUE(s.find("flags:[int]") != std::string::npos);
+    ASSERT_TRUE(s.find("flags@[int]") != std::string::npos);
     auto w2 = ason::decode<WithBoolVec>(s);
     ASSERT_EQ(w2.flags.size(), 3u);
     ASSERT_EQ(w2.flags[0], 1);
@@ -776,7 +860,7 @@ void test_encode_typed_int_vec_field() {
     TEST(encode_typed_int_vec_field);
     WithIntVec w; w.nums = {10, 20, 30};
     auto s = ason::encode_typed(w);
-    ASSERT_TRUE(s.find("nums:[int]") != std::string::npos);
+    ASSERT_TRUE(s.find("nums@[int]") != std::string::npos);
     auto w2 = ason::decode<WithIntVec>(s);
     ASSERT_EQ(w2.nums.size(), 3u);
     ASSERT_EQ(w2.nums[0], 10);
@@ -788,7 +872,7 @@ void test_encode_typed_str_vec_field() {
     TEST(encode_typed_str_vec_field);
     WithStrVec w; w.tags = {"a", "b", "c"};
     auto s = ason::encode_typed(w);
-    ASSERT_TRUE(s.find("tags:[str]") != std::string::npos);
+    ASSERT_TRUE(s.find("tags@[str]") != std::string::npos);
     auto w2 = ason::decode<WithStrVec>(s);
     ASSERT_EQ(w2.tags.size(), 3u);
     ASSERT_EQ(w2.tags[0], "a");
@@ -800,7 +884,7 @@ void test_encode_typed_empty_int_vec() {
     TEST(encode_typed_empty_int_vec);
     WithBoolVec w; w.flags = {};
     auto s = ason::encode_typed(w);
-    ASSERT_TRUE(s.find("flags:[int]") != std::string::npos);
+    ASSERT_TRUE(s.find("flags@[int]") != std::string::npos);
     ASSERT_TRUE(s.find("[]") != std::string::npos);
     PASS();
 }
@@ -820,7 +904,7 @@ void test_encode_pretty_typed_int_vec_field() {
 void test_decode_field_names_with_underscore() {
     TEST(decode_field_names_with_underscore);
     // Decode ASON with underscore in field names
-    auto s = ason::decode<Simple>("{id:int,name:str,active:bool}:(42,Alice,true)");
+    auto s = ason::decode<Simple>("{id@int,name@str,active@bool}:(42,Alice,true)");
     ASSERT_EQ(s.id, 42);
     ASSERT_EQ(s.name, "Alice");
     ASSERT_TRUE(s.active);
@@ -875,12 +959,14 @@ int main() {
     test_vec_field();
     test_empty_vec();
     test_nested_vec();
-    test_map_field();
-    test_map_roundtrip();
-    test_typed_map_roundtrip();
-    test_decode_typed_map_schema();
-    test_complex_map_roundtrip();
-    test_decode_typed_complex_map_schema();
+    test_entry_field();
+    test_entry_roundtrip();
+    test_typed_entry_roundtrip();
+    test_decode_typed_entry_schema();
+    test_complex_entry_roundtrip();
+    test_decode_typed_complex_entry_schema();
+    test_pretty_typed_complex_entry_roundtrip();
+    test_binary_complex_entry_roundtrip();
 
     std::cout << "\n--- Nested structs ---\n";
     test_nested_struct();
@@ -932,7 +1018,7 @@ int main() {
     test_pretty_vec_roundtrip();
     test_pretty_nested_roundtrip();
     test_pretty_optional_roundtrip();
-    test_pretty_typed_map_roundtrip();
+    test_pretty_typed_entry_roundtrip();
     test_pretty_complex_vec_roundtrip();
     test_pretty_deep_nesting_roundtrip();
 

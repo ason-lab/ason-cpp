@@ -20,7 +20,7 @@ ASON 只写一次 Schema，重复行以元组形式保存：
 ```
 
 ```text
-[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)
+[{id@int,name@str,active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 这可以减少重复键名、减小体积，同时保留清晰的类型结构。
@@ -31,7 +31,7 @@ ASON 只写一次 Schema，重复行以元组形式保存：
 - 当前 API 是 `encode` / `decode`，不再是旧文档里的 `dump` / `load`
 - 同时支持文本格式和二进制格式
 - SIMD 优化解析，尽量零拷贝解码
-- 支持 `std::optional`、`std::vector`、`std::unordered_map` 和嵌套结构体
+- 支持 `std::optional`、`std::vector`、嵌套结构体，以及条目列表集合
 
 ## 快速开始
 
@@ -59,9 +59,29 @@ std::string text = ason::encode(user);
 // {id,name,active}:(1,Alice,true)
 
 std::string typed = ason::encode_typed(user);
-// {id:int,name:str,active:bool}:(1,Alice,true)
+// {id@int,name@str,active@bool}:(1,Alice,true)
 
 User decoded = ason::decode<User>(text);
+```
+
+### 如何表示键值集合
+
+ASON C++ 已不再提供原生 map/dictionary 字段语法。
+如需表达键值数据，请改用“条目结构体数组”：
+
+```cpp
+struct EnvEntry {
+  std::string key;
+  std::string value;
+};
+
+ASON_FIELDS(EnvEntry,
+    (key, "key", "str"),
+    (value, "value", "str"))
+
+struct ServiceConfig {
+  std::vector<EnvEntry> env;
+};
 ```
 
 ### 编码和解码 vector
@@ -107,7 +127,7 @@ cmake --build build
 ctest --test-dir build
 ```
 
-## Latest Benchmarks
+## 最新基准
 
 在当前这台机器上通过下面命令实测：
 
@@ -117,12 +137,12 @@ ctest --test-dir build
 
 关键结果：
 
-- 扁平 1,000 条记录：ASON 文本序列化 `67.79ms`，JSON `166.63ms`；反序列化 ASON `133.95ms`，JSON `245.80ms`
-- 吞吐总结：ASON 文本序列化比 JSON 快 `2.69x`，反序列化快 `1.77x`
+- 扁平 1,000 条记录：ASON 文本序列化 `11.66ms`，JSON `29.05ms`；反序列化 ASON `34.63ms`，JSON `44.75ms`
+- 吞吐总结：ASON 文本序列化比 JSON 快 `2.49x`，反序列化快 `1.29x`
 - 1,000 条扁平记录体积：JSON `121,675 B`，ASON 文本 `56,718 B`（缩小 `53%`），ASON 二进制 `74,454 B`（缩小 `39%`）
-- 二进制解码尤其明显：在 1,000 条扁平记录上 `29.18ms` 对比 JSON `245.80ms`，约快 `8.42x`
+- 二进制解码尤其明显：在 1,000 条扁平记录上 `5.97ms` 对比 JSON `44.75ms`，约快 `7.50x`
 
-对于 100 条深层 company 数据，ASON 文本大小约 `187 KB`，JSON 约 `432 KB`，而且文本解码快 `2.38x`。
+对于 100 条深层 company 数据，ASON 文本大小约 `170,183 B`，JSON 约 `431,612 B`，而且文本解码快 `2.45x`。
 
 ## Contributors
 

@@ -5,7 +5,7 @@
 // API:
 //   ason::encode(object)           -> std::string       (serialize single struct)
 //   ason::encode(vector)           -> std::string       (serialize vector)
-//   ason::encode_typed(object)     -> std::string       (serialize with type annotations)
+//   ason::encode_typed(object)     -> std::string       (serialize with @ annotations)
 //   ason::encode_typed(vector)     -> std::string       (serialize vector typed)
 //   ason::decode<T>(str)           -> T                 (deserialize, auto-detects single/{vec})
 //   ason::encode_bin(object)       -> std::string       (binary serialize)
@@ -30,7 +30,6 @@
 #include <string_view>
 #include <vector>
 #include <optional>
-#include <unordered_map>
 #include <type_traits>
 #include <stdexcept>
 #include <array>
@@ -511,20 +510,6 @@ void dump_value(std::string& buf, const std::optional<T>& v) {
     // else: empty (null)
 }
 
-template <typename K, typename V>
-void dump_value(std::string& buf, const std::unordered_map<K, V>& m) {
-    buf.push_back('<');
-    bool first = true;
-    for (auto& [k, v] : m) {
-        if (!first) { buf.push_back(','); buf.push_back(' '); }
-        first = false;
-        dump_value(buf, k);
-        buf.push_back(':');
-        dump_value(buf, v);
-    }
-    buf.push_back('>');
-}
-
 // Struct dump — requires AsonFields specialization
 template <typename T>
 std::enable_if_t<AsonFields<T>::defined, void>
@@ -717,7 +702,7 @@ struct ParsedSchema {
     int count = 0;
 };
 
-// Parse schema: {field1,field2,...} or {field1:type1,...}
+// Parse schema: {field1,field2,...} or {field1@type1,...}
 // Returns field names as string_views (zero-copy, no heap allocation).
 inline ParsedSchema parse_schema(const char*& pos, const char* end) {
     if (pos >= end || *pos != '{') throw Error("expected '{'");
@@ -736,39 +721,31 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
         const char* start = pos;
         while (pos < end) {
             char b = *pos;
-            if (b == ',' || b == '}' || b == ':' || b == ' ' || b == '\t') break;
+            if (b == ',' || b == '}' || b == '@' || b == ':' || b == ' ' || b == '\t') break;
             pos++;
         }
         if (result.count < ParsedSchema::MAX_FIELDS) {
             result.fields[result.count++] = std::string_view(start, pos - start);
         }
         skip_whitespace(pos, end);
-        // Skip optional type annotation after ':'
         if (pos < end && *pos == ':') {
+            throw Error("legacy ':' field annotations are not supported; use '@'");
+        }
+        // Skip optional annotation after '@'
+        if (pos < end && *pos == '@') {
             pos++;
             skip_whitespace(pos, end);
-            if (pos < end && (*pos == '{' || *pos == '[' || *pos == '<')) {
+            if (pos < end && (*pos == '{' || *pos == '[')) {
                 std::vector<char> stack;
                 while (pos < end) {
                     char ch = *pos;
                     if (ch == '{') stack.push_back('}');
                     else if (ch == '[') stack.push_back(']');
-                    else if (ch == '<') stack.push_back('>');
                     else if (!stack.empty() && ch == stack.back()) {
                         stack.pop_back();
                         if (stack.empty()) { pos++; break; }
                     }
                     pos++;
-                }
-            } else if (pos + 3 <= end && pos[0] == 'm' && pos[1] == 'a' && pos[2] == 'p') {
-                pos += 3;
-                if (pos < end && *pos == '[') {
-                    int depth = 0;
-                    while (pos < end) {
-                        if (*pos == '[') depth++;
-                        else if (*pos == ']') { depth--; if (depth == 0) { pos++; break; } }
-                        pos++;
-                    }
                 }
             } else {
                 while (pos < end) {
@@ -801,9 +778,8 @@ inline void skip_value(const char*& pos, const char* end) {
         case '"': pos++; while (pos < end) { if (*pos == '"') { pos++; return; } if (*pos == '\\') pos++; pos++; } break;
         case '(': skip_balanced(pos, end, '(', ')'); break;
         case '[': skip_balanced(pos, end, '[', ']'); break;
-        case '<': skip_balanced(pos, end, '<', '>'); break;
         default:
-            while (pos < end) { char b = *pos; if (b == ',' || b == ')' || b == ']' || b == '>' || b == ':') return; pos++; }
+            while (pos < end) { char b = *pos; if (b == ',' || b == ')' || b == ']') return; pos++; }
             break;
     }
 }
@@ -950,33 +926,6 @@ void load_value(const char*& pos, const char* end, std::optional<T>& out) {
     out = std::move(val);
 }
 
-template <typename K, typename V>
-void load_value(const char*& pos, const char* end, std::unordered_map<K, V>& out) {
-    detail::skip_whitespace_and_comments(pos, end);
-    if (pos >= end || *pos != '<') throw Error("expected '<'");
-    pos++;
-    out.clear();
-    bool first = true;
-    for (;;) {
-        detail::skip_whitespace_and_comments(pos, end);
-        if (pos >= end || *pos == '>') { pos++; break; }
-        if (!first) {
-            if (*pos == ',') {
-                pos++;
-                detail::skip_whitespace_and_comments(pos, end);
-                if (pos < end && *pos == '>') { pos++; break; }
-            } else break;
-        }
-        first = false;
-        K key; load_value(pos, end, key);
-        detail::skip_whitespace_and_comments(pos, end);
-        if (pos >= end || *pos != ':') throw Error("expected ':' in map entry");
-        pos++;
-        V val; load_value(pos, end, val);
-        out[std::move(key)] = std::move(val);
-    }
-}
-
 // Struct load — requires AsonFields specialization
 template <typename T>
 std::enable_if_t<AsonFields<T>::defined, void>
@@ -990,7 +939,7 @@ load_value(const char*& pos, const char* end, T& out) {
         if (pos >= end || *pos != ':') throw Error("expected ':'");
         pos++;
         detail::skip_whitespace_and_comments(pos, end);
-        // Build field map on stack: schema index -> struct field index
+        // Build a stack-local index table: schema index -> struct field index
         int field_map[detail::ParsedSchema::MAX_FIELDS];
         for (int fi = 0; fi < schema.count; fi++)
             field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
@@ -1145,32 +1094,6 @@ inline void load_bin_value(const char*& pos, const char* end, std::optional<T>& 
     }
 }
 
-template <typename K, typename V>
-inline void dump_bin_value(std::string& buf, const std::unordered_map<K, V>& m) {
-    uint32_t len = m.size();
-    buf.append(reinterpret_cast<const char*>(&len), 4);
-    for (const auto& [k, v] : m) {
-        dump_bin_value(buf, k);
-        dump_bin_value(buf, v);
-    }
-}
-
-template <typename K, typename V>
-inline void load_bin_value(const char*& pos, const char* end, std::unordered_map<K, V>& out) {
-    uint32_t len;
-    std::memcpy(&len, pos, 4);
-    pos += 4;
-    out.clear();
-    out.reserve(len);
-    for (uint32_t i = 0; i < len; i++) {
-        K k;
-        load_bin_value(pos, end, k);
-        V v;
-        load_bin_value(pos, end, v);
-        out.emplace(std::move(k), std::move(v));
-    }
-}
-
 template <typename T>
 inline std::enable_if_t<AsonFields<T>::defined, void>
 dump_bin_value(std::string& buf, const T& v) {
@@ -1193,73 +1116,44 @@ template <typename T> struct is_vector : std::false_type {};
 template <typename T> struct is_vector<std::vector<T>> : std::true_type {};
 template <typename T> struct is_optional : std::false_type {};
 template <typename T> struct is_optional<std::optional<T>> : std::true_type {};
-template <typename T> struct is_unordered_map : std::false_type {};
-template <typename K, typename V, typename H, typename E, typename A>
-struct is_unordered_map<std::unordered_map<K, V, H, E, A>> : std::true_type {};
 
 // write_field_schema: recursively write schema annotation for a field type.
-// Struct fields get :{f1,f2,...}, vector<struct> fields get :[{f1,f2,...}],
-// primitives get :type only in typed mode.
+// Struct fields get @{f1,f2,...}, vector<struct> fields get @[{f1,f2,...}],
+// primitives get @type only in typed mode.
 template <typename FieldType>
 inline void write_field_schema(std::string& buf, bool typed) {
     using T = std::decay_t<FieldType>;
     if constexpr (AsonFields<T>::defined) {
-        // Nested struct: field:{f1,f2,...}
-        buf.push_back(':');
+        // Nested struct: field@{f1,f2,...}
+        buf.push_back('@');
         buf.push_back('{');
         AsonFields<T>::write_schema(buf, typed);
         buf.push_back('}');
     } else if constexpr (is_vector<T>::value) {
         using Elem = typename T::value_type;
         if constexpr (AsonFields<Elem>::defined) {
-            // Vector of structs: field:[{f1,f2,...}]
-            buf.append(":[{", 3);
+            // Vector of structs: field@[{f1,f2,...}]
+            buf.append("@[{", 3);
             AsonFields<Elem>::write_schema(buf, typed);
             buf.append("}]", 2);
         } else if (typed) {
             auto tn = TypeName<Elem>::value;
-            if (tn) { buf.push_back(':'); buf.push_back('['); buf.append(tn); buf.push_back(']'); }
-        }
-    } else if constexpr (is_unordered_map<T>::value) {
-        if (typed) {
-            auto key_tn = TypeName<typename T::key_type>::value;
-            auto val_tn = TypeName<typename T::mapped_type>::value;
-            if (key_tn && val_tn) {
-                buf.push_back(':');
-                buf.push_back('<');
-                buf.append(key_tn);
-                buf.push_back(':');
-                buf.append(val_tn);
-                buf.push_back('>');
-            }
+            if (tn) { buf.push_back('@'); buf.push_back('['); buf.append(tn); buf.push_back(']'); }
         }
     } else if constexpr (is_optional<T>::value) {
         using Inner = typename T::value_type;
         if constexpr (AsonFields<Inner>::defined) {
-            buf.push_back(':');
+            buf.push_back('@');
             buf.push_back('{');
             AsonFields<Inner>::write_schema(buf, typed);
             buf.push_back('}');
-        } else if constexpr (is_unordered_map<Inner>::value) {
-            if (typed) {
-                auto key_tn = TypeName<typename Inner::key_type>::value;
-                auto val_tn = TypeName<typename Inner::mapped_type>::value;
-                if (key_tn && val_tn) {
-                    buf.push_back(':');
-                    buf.push_back('<');
-                    buf.append(key_tn);
-                    buf.push_back(':');
-                    buf.append(val_tn);
-                    buf.push_back('>');
-                }
-            }
         } else if (typed) {
             auto tn = TypeName<Inner>::value;
-            if (tn) { buf.push_back(':'); buf.append(tn); }
+            if (tn) { buf.push_back('@'); buf.append(tn); }
         }
     } else if (typed) {
         auto tn = TypeName<T>::value;
-        if (tn) { buf.push_back(':'); buf.append(tn); }
+        if (tn) { buf.push_back('@'); buf.append(tn); }
     }
 }
 } // namespace detail
@@ -1340,7 +1234,7 @@ std::string encode_typed(const T& v) {
 // ---------------------------------------------------------------------------
 // Pretty-format: smart indentation for ASON output
 // ---------------------------------------------------------------------------
-//   Simple structures stay inline:   {name:str, age:int}:(Alice, 30)
+//   Simple structures stay inline:   {name@str, age@int}:(Alice, 30)
 //   Complex structures expand with 2-space indentation.
 namespace detail {
 
@@ -1736,7 +1630,7 @@ T decode_bin(std::string_view input) {
 //     (name, "name", "str"),
 //     (active,"active","bool"))
 //
-// The third element (type string) is used for typed schema output.
+// The third element is retained for declaration readability; typed schema output is inferred from C++ types.
 
 #define ASON_FIELDS(StructName, ...) \
     template <> struct ason::AsonFields<StructName> { \

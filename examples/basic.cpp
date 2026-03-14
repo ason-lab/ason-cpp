@@ -37,11 +37,11 @@ int main() {
   auto typed_str = ason::encode_typed(user);
   std::cout << "2. Serialize with type annotations:\n   " << typed_str
             << "\n\n";
-  assert(typed_str.find("{id:int,name:str,active:bool}:") == 0);
+  assert(typed_str.find("{id@int,name@str,active@bool}:") == 0);
 
   // 3. Deserialize from ASON
   auto loaded =
-      ason::decode<User>("{id:int,name:str,active:bool}:(1,Alice,true)");
+      ason::decode<User>("{id@int,name@str,active@bool}:(1,Alice,true)");
   std::cout << "3. Deserialize single struct:\n   "
             << "User{id=" << loaded.id << ", name=\"" << loaded.name
             << "\", active=" << (loaded.active ? "true" : "false") << "}\n\n";
@@ -62,10 +62,10 @@ int main() {
   auto typed_vec = ason::encode_typed(users);
   std::cout << "5. Serialize vec with type annotations:\n   " << typed_vec
             << "\n\n";
-  assert(typed_vec.find("[{id:int,name:str,active:bool}]:") == 0);
+  assert(typed_vec.find("[{id@int,name@str,active@bool}]:") == 0);
 
   // 6. Deserialize vec
-  auto input6 = std::string_view("[{id:int,name:str,active:bool}]:(1,Alice,true),"
+  auto input6 = std::string_view("[{id@int,name@str,active@bool}]:(1,Alice,true),"
                                  "(2,Bob,false),(3,\"Carol Smith\",true)");
   auto users2 = ason::decode<std::vector<User>>(input6);
   std::cout << "6. Deserialize vec:\n";
@@ -78,7 +78,7 @@ int main() {
 
   // 7. Multiline format
   std::cout << "\n7. Multiline format:\n";
-  auto multiline = std::string_view("[{id:int, name:str, active:bool}]:\n"
+  auto multiline = std::string_view("[{id@int, name@str, active@bool}]:\n"
                                     "  (1, Alice, true),\n"
                                     "  (2, Bob, false),\n"
                                     "  (3, \"Carol Smith\", true)");

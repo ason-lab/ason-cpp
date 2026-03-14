@@ -1,7 +1,6 @@
 #include "ason.hpp"
 #include <cassert>
 #include <iostream>
-#include <unordered_map>
 
 // ===========================================================================
 // Basic types
@@ -20,14 +19,21 @@ struct Employee {
   bool active = false;
 };
 ASON_FIELDS(Employee, (id, "id", "int"), (name, "name", "str"),
-            (dept, "dept", "{title:str}"), (skills, "skills", "[str]"),
+            (dept, "dept", "@{title@str}"), (skills, "skills", "@[str]"),
             (active, "active", "bool"))
 
-struct WithMap {
-  std::string name;
-  std::unordered_map<std::string, int64_t> attrs;
+struct AttrEntry {
+  std::string key;
+  int64_t value = 0;
 };
-ASON_FIELDS(WithMap, (name, "name", "str"), (attrs, "attrs", "<str:int>"))
+ASON_FIELDS(AttrEntry, (key, "key", "str"), (value, "value", "int"))
+
+struct WithEntries {
+  std::string name;
+  std::vector<AttrEntry> attrs;
+};
+ASON_FIELDS(WithEntries, (name, "name", "str"),
+            (attrs, "attrs", "@[{key@str,value@int}]"))
 
 struct Address {
   std::string city;
@@ -39,7 +45,7 @@ struct Nested {
   std::string name;
   Address addr;
 };
-ASON_FIELDS(Nested, (name, "name", "str"), (addr, "addr", "{city:str,zip:int}"))
+ASON_FIELDS(Nested, (name, "name", "str"), (addr, "addr", "@{city@str,zip@int}"))
 
 // ===========================================================================
 // All-types struct
@@ -70,8 +76,8 @@ ASON_FIELDS(AllTypes, (b, "b", "bool"), (i8v, "i8v", "int"),
             (u64v, "u64v", "int"), (f32v, "f32v", "float"),
             (f64v, "f64v", "float"), (s, "s", "str"),
             (opt_some, "opt_some", "int"), (opt_none, "opt_none", "int"),
-            (vec_int, "vec_int", "[int]"), (vec_str, "vec_str", "[str]"),
-            (nested_vec, "nested_vec", "[[int]]"))
+            (vec_int, "vec_int", "@[int]"), (vec_str, "vec_str", "@[str]"),
+            (nested_vec, "nested_vec", "@[[int]]"))
 
 // ===========================================================================
 // 5-level deep: Country > Region > City > District > Street > Building
@@ -94,7 +100,7 @@ struct Street {
 };
 ASON_FIELDS(Street, (name, "name", "str"), (length_km, "length_km", "float"),
             (buildings, "buildings",
-             "[{name:str,floors:int,residential:bool,height_m:float}]"))
+             "@[{name@str,floors@int,residential@bool,height_m@float}]"))
 
 struct District {
   std::string name;
@@ -102,7 +108,7 @@ struct District {
   std::vector<Street> streets;
 };
 ASON_FIELDS(District, (name, "name", "str"), (population, "population", "int"),
-            (streets, "streets", "[{name:str,length_km:float,buildings}]"))
+            (streets, "streets", "@[{name@str,length_km@float,buildings}]"))
 
 struct City {
   std::string name;
@@ -112,7 +118,7 @@ struct City {
 };
 ASON_FIELDS(City, (name, "name", "str"), (population, "population", "int"),
             (area_km2, "area_km2", "float"),
-            (districts, "districts", "[{name:str,population:int,streets}]"))
+            (districts, "districts", "@[{name@str,population@int,streets}]"))
 
 struct Region {
   std::string name;
@@ -120,7 +126,7 @@ struct Region {
 };
 ASON_FIELDS(Region, (name, "name", "str"),
             (cities, "cities",
-             "[{name:str,population:int,area_km2:float,districts}]"))
+             "@[{name@str,population@int,area_km2@float,districts}]"))
 
 struct Country {
   std::string name;
@@ -132,7 +138,7 @@ struct Country {
 ASON_FIELDS(Country, (name, "name", "str"), (code, "code", "str"),
             (population, "population", "int"),
             (gdp_trillion, "gdp_trillion", "float"),
-            (regions, "regions", "[{name:str,cities}]"))
+            (regions, "regions", "@[{name@str,cities}]"))
 
 // ===========================================================================
 // 7-level deep: Universe > Galaxy > SolarSystem > Planet > Continent > Nation >
@@ -152,14 +158,14 @@ struct Nation {
   std::vector<State> states;
 };
 ASON_FIELDS(Nation, (name, "name", "str"),
-            (states, "states", "[{name:str,capital:str,population:int}]"))
+            (states, "states", "@[{name@str,capital@str,population@int}]"))
 
 struct Continent {
   std::string name;
   std::vector<Nation> nations;
 };
 ASON_FIELDS(Continent, (name, "name", "str"),
-            (nations, "nations", "[{name:str,states}]"))
+            (nations, "nations", "@[{name@str,states}]"))
 
 struct Planet {
   std::string name;
@@ -169,7 +175,7 @@ struct Planet {
 };
 ASON_FIELDS(Planet, (name, "name", "str"), (radius_km, "radius_km", "float"),
             (has_life, "has_life", "bool"),
-            (continents, "continents", "[{name:str,nations}]"))
+            (continents, "continents", "@[{name@str,nations}]"))
 
 struct SolarSystem {
   std::string name;
@@ -178,7 +184,7 @@ struct SolarSystem {
 };
 ASON_FIELDS(SolarSystem, (name, "name", "str"), (star_type, "star_type", "str"),
             (planets, "planets",
-             "[{name:str,radius_km:float,has_life:bool,continents}]"))
+             "@[{name@str,radius_km@float,has_life@bool,continents}]"))
 
 struct Galaxy {
   std::string name;
@@ -187,7 +193,7 @@ struct Galaxy {
 };
 ASON_FIELDS(Galaxy, (name, "name", "str"),
             (star_count_billions, "star_count_billions", "float"),
-            (systems, "systems", "[{name:str,star_type:str,planets}]"))
+            (systems, "systems", "@[{name@str,star_type@str,planets}]"))
 
 struct Universe {
   std::string name;
@@ -197,7 +203,7 @@ struct Universe {
 ASON_FIELDS(Universe, (name, "name", "str"),
             (age_billion_years, "age_billion_years", "float"),
             (galaxies, "galaxies",
-             "[{name:str,star_count_billions:float,systems}]"))
+             "@[{name@str,star_count_billions@float,systems}]"))
 
 // ===========================================================================
 // Service config
@@ -231,6 +237,12 @@ struct LogConfig {
 ASON_FIELDS(LogConfig, (level, "level", "str"), (file, "file", "str"),
             (rotate, "rotate", "bool"))
 
+struct StringEntry {
+  std::string key;
+  std::string value;
+};
+ASON_FIELDS(StringEntry, (key, "key", "str"), (value, "value", "str"))
+
 struct ServiceConfig {
   std::string name;
   std::string version;
@@ -238,15 +250,16 @@ struct ServiceConfig {
   CacheConfig cache;
   LogConfig log;
   std::vector<std::string> features;
-  std::unordered_map<std::string, std::string> env;
+  std::vector<StringEntry> env;
 };
 ASON_FIELDS(
     ServiceConfig, (name, "name", "str"), (version, "version", "str"),
     (db, "db",
-     "{host:str,port:int,max_connections:int,ssl:bool,timeout_ms:float}"),
-    (cache, "cache", "{enabled:bool,ttl_seconds:int,max_size_mb:int}"),
-    (log, "log", "{level:str,file:str,rotate:bool}"),
-    (features, "features", "[str]"), (env, "env", "<str:str>"))
+     "@{host@str,port@int,max_connections@int,ssl@bool,timeout_ms@float}"),
+    (cache, "cache", "@{enabled@bool,ttl_seconds@int,max_size_mb@int}"),
+    (log, "log", "@{level@str,file@str,rotate@bool}"),
+    (features, "features", "@[str]"),
+    (env, "env", "@[{key@str,value@str}]"))
 
 // ===========================================================================
 // Helper: print struct
@@ -279,7 +292,7 @@ ASON_FIELDS(Nums, (a, "a", "int"), (b, "b", "float"), (c, "c", "int"))
 struct WithVec {
   std::vector<int64_t> items;
 };
-ASON_FIELDS(WithVec, (items, "items", "[int]"))
+ASON_FIELDS(WithVec, (items, "items", "@[int]"))
 
 struct Special {
   std::string val;
@@ -289,7 +302,7 @@ ASON_FIELDS(Special, (val, "val", "str"))
 struct Matrix3D {
   std::vector<std::vector<std::vector<int64_t>>> data;
 };
-ASON_FIELDS(Matrix3D, (data, "data", "[[[int]]]"))
+ASON_FIELDS(Matrix3D, (data, "data", "@[[[int]]]"))
 
 int main() {
   std::cout << "=== ASON Complex Examples (C++) ===\n\n";
@@ -297,7 +310,7 @@ int main() {
   // 1. Nested struct
   std::cout << "1. Nested struct:\n";
   auto emp = ason::decode<Employee>(
-      "{id,name,dept:{title},skills,active}:(1,Alice,(Manager),[rust],true)");
+      "{id,name,dept@{title},skills,active}:(1,Alice,(Manager),[rust],true)");
   std::cout << "   Employee{id=" << emp.id << ", name=" << emp.name
             << ", dept=" << emp.dept.title << ", skills=[";
   for (size_t i = 0; i < emp.skills.size(); i++) {
@@ -310,7 +323,7 @@ int main() {
   // 2. Vec with nested structs
   std::cout << "2. Vec with nested structs:\n";
   auto input2 = std::string_view(
-      "[{id:int,name:str,dept:{title:str},skills:[str],active:bool}]:\n"
+      "[{id@int,name@str,dept@{title@str},skills@[str],active@bool}]:\n"
       "  (1, Alice, (Manager), [Rust, Go], true),\n"
       "  (2, Bob, (Engineer), [Python], false),\n"
       "  (3, \"Carol Smith\", (Director), [Leadership, Strategy], true)");
@@ -318,15 +331,18 @@ int main() {
   for (auto &e : employees)
     std::cout << "   Employee{id=" << e.id << ", name=" << e.name << "}\n";
 
-  // 3. Map/Dict field
-  std::cout << "\n3. Map/Dict field:\n";
-  auto wm = ason::decode<WithMap>("{name,attrs}:(Alice,<age:30,score:95>)");
-  std::cout << "   name=" << wm.name << ", attrs={";
-  for (auto &[k, v] : wm.attrs)
-    std::cout << k << ":" << v << " ";
-  std::cout << "}\n";
-  assert(wm.attrs.at("age") == 30);
-  assert(wm.attrs.at("score") == 95);
+  // 3. Entry-list field
+  std::cout << "\n3. Entry-list field:\n";
+  auto wm = ason::decode<WithEntries>(
+      "{name,attrs@[{key,value}]}:(Alice,[(age,30),(score,95)])");
+  std::cout << "   name=" << wm.name << ", attrs=[";
+  for (const auto &entry : wm.attrs)
+    std::cout << "(" << entry.key << "," << entry.value << ") ";
+  std::cout << "]\n";
+  assert(wm.attrs[0].key == "age");
+  assert(wm.attrs[0].value == 30);
+  assert(wm.attrs[1].key == "score");
+  assert(wm.attrs[1].value == 95);
 
   // 4. Nested struct roundtrip
   std::cout << "\n4. Nested struct roundtrip:\n";
@@ -563,7 +579,7 @@ int main() {
             << "% smaller than text\n";
 
   // 12. Service config
-  std::cout << "\n12. Complex config struct (nested + map + optional):\n";
+  std::cout << "\n12. Complex config struct (nested + entry-list + optional):\n";
   ServiceConfig config{
       "my-service",
       "2.1.0",
@@ -660,10 +676,10 @@ int main() {
   // 14. Deep schema type hints
   std::cout << "\n14. Deserialize with nested schema type hints:\n";
   auto c14 = ason::decode<Country>(
-      "{name:str,code:str,population:int,gdp_trillion:float,"
-      "regions:[{name:str,cities:[{name:str,population:int,area_km2:float,"
-      "districts:[{name:str,population:int,streets:[{name:str,length_km:float,"
-      "buildings:[{name:str,floors:int,residential:bool,height_m:float}]}]}]}]}"
+      "{name@str,code@str,population@int,gdp_trillion@float,"
+      "regions@[{name@str,cities@[{name@str,population@int,area_km2@float,"
+      "districts@[{name@str,population@int,streets@[{name@str,length_km@float,"
+      "buildings@[{name@str,floors@int,residential@bool,height_m@float}]}]}]}]}"
       "]}"
       ":(TestLand,TL,1000000,0.5,[(TestRegion,[(TestCity,500000,100.0,"
       "[(Central,250000,[(Main St,2.5,[(HQ,10,false,45.0)])])])])])");
@@ -741,7 +757,7 @@ int main() {
 
   // 18. Comments
   std::cout << "\n18. Comments:\n";
-  auto emp18 = ason::decode<Employee>("{id,name,dept:{title},skills,active}:/* "
+  auto emp18 = ason::decode<Employee>("{id,name,dept@{title},skills,active}:/* "
                                     "inline */ (1,Alice,(HR),[rust],true)");
   std::cout << "   with inline comment: Employee{id=" << emp18.id
             << ", name=" << emp18.name << "}\n";

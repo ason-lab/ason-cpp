@@ -15,7 +15,7 @@ struct User {
     std::vector<Detail> details;
 };
 
-ASON_FIELDS(User, (details, "details", "[{ID:int,Name:str,Age:int,Gender:bool}]"))
+ASON_FIELDS(User, (details, "details", "[{ID@int,Name@str,Age@int,Gender@bool}]"))
 
 struct Person {
     int64_t id;
@@ -29,7 +29,7 @@ struct Human {
     std::vector<Person> details;
 };
 
-ASON_FIELDS(Human, (details, "details", "[{ID:int,Name:str,Age:int}]"))
+ASON_FIELDS(Human, (details, "details", "[{ID@int,Name@str,Age@int}]"))
 
 int main() {
     std::vector<User> users = {

@@ -20,7 +20,7 @@ ASON writes the schema once and stores repeated rows as tuples:
 ```
 
 ```text
-[{id:int,name:str,active:bool}]:(1,Alice,true),(2,Bob,false)
+[{id@int,name@str,active@bool}]:(1,Alice,true),(2,Bob,false)
 ```
 
 That cuts repeated keys, reduces payload size, and keeps typed structure visible.
@@ -31,7 +31,7 @@ That cuts repeated keys, reduces payload size, and keeps typed structure visible
 - Current API uses `encode` / `decode`, not the older `dump` / `load` names
 - Text and binary formats
 - SIMD-aware parser and zero-copy-friendly decoding
-- Support for `std::optional`, `std::vector`, `std::unordered_map`, and nested structs
+- Support for `std::optional`, `std::vector`, nested structs, and entry-list collections
 
 ## Quick Start
 
@@ -59,9 +59,29 @@ std::string text = ason::encode(user);
 // {id,name,active}:(1,Alice,true)
 
 std::string typed = ason::encode_typed(user);
-// {id:int,name:str,active:bool}:(1,Alice,true)
+// {id@int,name@str,active@bool}:(1,Alice,true)
 
 User decoded = ason::decode<User>(text);
+```
+
+### Modeling key-value collections
+
+ASON C++ no longer provides a native map/dictionary field syntax.
+Model key-value data as arrays of entry structs instead:
+
+```cpp
+struct EnvEntry {
+  std::string key;
+  std::string value;
+};
+
+ASON_FIELDS(EnvEntry,
+    (key, "key", "str"),
+    (value, "value", "str"))
+
+struct ServiceConfig {
+  std::vector<EnvEntry> env;
+};
 ```
 
 ### Encode and decode a vector
@@ -117,12 +137,12 @@ Measured on this machine with:
 
 Headline numbers:
 
-- Flat 1,000-record dataset: ASON text serialize `67.79ms` vs JSON `166.63ms`, deserialize `133.95ms` vs JSON `245.80ms`
-- Throughput summary: ASON text was `2.69x` faster than JSON for serialize and `1.77x` faster for deserialize
+- Flat 1,000-record dataset: ASON text serialize `11.66ms` vs JSON `29.05ms`, deserialize `34.63ms` vs JSON `44.75ms`
+- Throughput summary: ASON text was `2.49x` faster than JSON for serialize and `1.29x` faster for deserialize
 - Size summary for 1,000 flat records: JSON `121,675 B`, ASON text `56,718 B` (`53%` smaller), ASON binary `74,454 B` (`39%` smaller)
-- Binary decode was especially strong: `29.18ms` vs JSON `245.80ms` on flat 1,000-record data, or `8.42x` faster
+- Binary decode was especially strong: `5.97ms` vs JSON `44.75ms` on flat 1,000-record data, or `7.50x` faster
 
-For 100 deep company objects, ASON text serialized `1.87e5 B` vs JSON `4.32e5 B` and decoded `2.38x` faster.
+For 100 deep company objects, ASON text serialized `170,183 B` vs JSON `431,612 B` and decoded `2.45x` faster.
 
 ## Contributors
 

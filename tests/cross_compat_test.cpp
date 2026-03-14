@@ -3,7 +3,6 @@
 #include <cmath>
 #include <vector>
 #include <string>
-#include <unordered_map>
 #include "ason.hpp"
 
 static int tests_passed = 0;
@@ -29,7 +28,7 @@ ASON_FIELDS(MiniUser, (id,"id","int"),(name,"name","str"))
 
 // Dim 2
 struct RichProfile { int64_t id=0; std::string name; std::vector<std::string> tags; std::vector<int64_t> scores; };
-ASON_FIELDS(RichProfile, (id,"id","int"),(name,"name","str"),(tags,"tags","[str]"),(scores,"scores","[int]"))
+ASON_FIELDS(RichProfile, (id,"id","int"),(name,"name","str"),(tags,"tags","@[str]"),(scores,"scores","@[int]"))
 
 struct ThinProfile { int64_t id=0; std::string name; };
 ASON_FIELDS(ThinProfile, (id,"id","int"),(name,"name","str"))
@@ -39,45 +38,45 @@ struct InnerFull { int64_t x=0; int64_t y=0; double z=0; bool w=false; };
 ASON_FIELDS(InnerFull, (x,"x","int"),(y,"y","int"),(z,"z","float"),(w,"w","bool"))
 
 struct OuterFull { std::string name; InnerFull inner; bool flag=false; };
-ASON_FIELDS(OuterFull, (name,"name","str"),(inner,"inner","{x:int,y:int,z:float,w:bool}"),(flag,"flag","bool"))
+ASON_FIELDS(OuterFull, (name,"name","str"),(inner,"inner","@{x@int,y@int,z@float,w@bool}"),(flag,"flag","bool"))
 
 struct InnerThin { int64_t x=0; int64_t y=0; };
 ASON_FIELDS(InnerThin, (x,"x","int"),(y,"y","int"))
 
 struct OuterThin { std::string name; InnerThin inner; };
-ASON_FIELDS(OuterThin, (name,"name","str"),(inner,"inner","{x:int,y:int}"))
+ASON_FIELDS(OuterThin, (name,"name","str"),(inner,"inner","@{x@int,y@int}"))
 
 // Dim 4: vec of nested
 struct TaskFull { std::string title; bool done=false; int64_t priority=0; double weight=0; };
 ASON_FIELDS(TaskFull, (title,"title","str"),(done,"done","bool"),(priority,"priority","int"),(weight,"weight","float"))
 
 struct ProjectFull { std::string name; std::vector<TaskFull> tasks; };
-ASON_FIELDS(ProjectFull, (name,"name","str"),(tasks,"tasks","[{title:str,done:bool,priority:int,weight:float}]"))
+ASON_FIELDS(ProjectFull, (name,"name","str"),(tasks,"tasks","@[{title@str,done@bool,priority@int,weight@float}]"))
 
 struct TaskThin { std::string title; bool done=false; };
 ASON_FIELDS(TaskThin, (title,"title","str"),(done,"done","bool"))
 
 struct ProjectThin { std::string name; std::vector<TaskThin> tasks; };
-ASON_FIELDS(ProjectThin, (name,"name","str"),(tasks,"tasks","[{title:str,done:bool}]"))
+ASON_FIELDS(ProjectThin, (name,"name","str"),(tasks,"tasks","@[{title@str,done@bool}]"))
 
 // Dim 5: deep 3-level
 struct L3Full { int64_t a=0; std::string b; bool c=false; };
 ASON_FIELDS(L3Full, (a,"a","int"),(b,"b","str"),(c,"c","bool"))
 
 struct L2Full { std::string name; L3Full sub; int64_t code=0; std::vector<std::string> tags; };
-ASON_FIELDS(L2Full, (name,"name","str"),(sub,"sub","{a:int,b:str,c:bool}"),(code,"code","int"),(tags,"tags","[str]"))
+ASON_FIELDS(L2Full, (name,"name","str"),(sub,"sub","@{a@int,b@str,c@bool}"),(code,"code","int"),(tags,"tags","@[str]"))
 
 struct L1Full { int64_t id=0; L2Full child; std::string extra; };
-ASON_FIELDS(L1Full, (id,"id","int"),(child,"child","{name:str,sub:{a:int,b:str,c:bool},code:int,tags:[str]}"),(extra,"extra","str"))
+ASON_FIELDS(L1Full, (id,"id","int"),(child,"child","@{name@str,sub@{a@int,b@str,c@bool},code@int,tags@[str]}"),(extra,"extra","str"))
 
 struct L3Thin { int64_t a=0; };
 ASON_FIELDS(L3Thin, (a,"a","int"))
 
 struct L2Thin { std::string name; L3Thin sub; };
-ASON_FIELDS(L2Thin, (name,"name","str"),(sub,"sub","{a:int}"))
+ASON_FIELDS(L2Thin, (name,"name","str"),(sub,"sub","@{a@int}"))
 
 struct L1Thin { int64_t id=0; L2Thin child; };
-ASON_FIELDS(L1Thin, (id,"id","int"),(child,"child","{name:str,sub:{a:int}}"))
+ASON_FIELDS(L1Thin, (id,"id","int"),(child,"child","@{name@str,sub@{a@int}}"))
 
 // Dim 6: field reorder
 struct OrderABC { int64_t a=0; std::string b; bool c=false; };
@@ -118,7 +117,7 @@ struct MatrixNestedOpt { std::string name; std::optional<std::string> nick; };
 ASON_FIELDS(MatrixNestedOpt, (name,"name","str"),(nick,"nick","str"))
 
 struct MatrixUserNestedOpt { int64_t id=0; MatrixNestedOpt profile; };
-ASON_FIELDS(MatrixUserNestedOpt, (id,"id","int"),(profile,"profile","{name:str,nick:str}"))
+ASON_FIELDS(MatrixUserNestedOpt, (id,"id","int"),(profile,"profile","@{name@str,nick@str}"))
 
 // Dim 10: special string
 struct SrcSpecialStr { int64_t id=0; std::string name; std::string bio; };
@@ -129,7 +128,7 @@ ASON_FIELDS(DstNoStr, (id,"id","int"))
 
 // Dim 11: trailing arrays
 struct SrcNestedArr { int64_t id=0; std::vector<int64_t> matrix; std::vector<std::string> tags; };
-ASON_FIELDS(SrcNestedArr, (id,"id","int"),(matrix,"matrix","[int]"),(tags,"tags","[str]"))
+ASON_FIELDS(SrcNestedArr, (id,"id","int"),(matrix,"matrix","@[int]"),(tags,"tags","@[str]"))
 
 // Dim 14: negative
 struct SrcNegative { int64_t a=0; int64_t b=0; double c=0; std::string d; };
@@ -145,12 +144,15 @@ ASON_FIELDS(SrcEmpty, (id,"id","int"),(name,"name","str"),(bio,"bio","str"))
 struct DstEmptyThin { int64_t id=0; };
 ASON_FIELDS(DstEmptyThin, (id,"id","int"))
 
-// Dim 16: map
-struct SrcWithMap { int64_t id=0; std::string name; std::unordered_map<std::string,int64_t> meta; };
-ASON_FIELDS(SrcWithMap, (id,"id","int"),(name,"name","str"),(meta,"meta","<str:int>"))
+// Dim 16: entry list
+struct MetaEntry { std::string key; int64_t value=0; };
+ASON_FIELDS(MetaEntry, (key,"key","str"),(value,"value","int"))
 
-struct DstNoMap { int64_t id=0; std::string name; };
-ASON_FIELDS(DstNoMap, (id,"id","int"),(name,"name","str"))
+struct SrcWithEntries { int64_t id=0; std::string name; std::vector<MetaEntry> meta; };
+ASON_FIELDS(SrcWithEntries, (id,"id","int"),(name,"name","str"),(meta,"meta","@[{key@str,value@int}]"))
+
+struct DstMetaThin { int64_t id=0; std::string name; };
+ASON_FIELDS(DstMetaThin, (id,"id","int"),(name,"name","str"))
 
 // Dim 20: bools
 struct SrcBools { int64_t id=0; bool a=false; bool b=false; bool c=false; };
@@ -178,16 +180,16 @@ ASON_FIELDS(DstBeta, (p,"p","int"),(q,"q","str"))
 
 // Dim 24: nested array of structs
 struct WorkerFull { std::string name; std::vector<std::string> skills; int64_t years_xp=0; double rating=0; };
-ASON_FIELDS(WorkerFull, (name,"name","str"),(skills,"skills","[str]"),(years_xp,"years_xp","int"),(rating,"rating","float"))
+ASON_FIELDS(WorkerFull, (name,"name","str"),(skills,"skills","@[str]"),(years_xp,"years_xp","int"),(rating,"rating","float"))
 
 struct TeamFull { std::string lead; std::vector<WorkerFull> workers; double budget=0; };
-ASON_FIELDS(TeamFull, (lead,"lead","str"),(workers,"workers","[{name:str,skills:[str],years_xp:int,rating:float}]"),(budget,"budget","float"))
+ASON_FIELDS(TeamFull, (lead,"lead","str"),(workers,"workers","@[{name@str,skills@[str],years_xp@int,rating@float}]"),(budget,"budget","float"))
 
 struct WorkerThin { std::string name; std::vector<std::string> skills; };
-ASON_FIELDS(WorkerThin, (name,"name","str"),(skills,"skills","[str]"))
+ASON_FIELDS(WorkerThin, (name,"name","str"),(skills,"skills","@[str]"))
 
 struct TeamThin { std::string lead; std::vector<WorkerThin> workers; };
-ASON_FIELDS(TeamThin, (lead,"lead","str"),(workers,"workers","[{name:str,skills:[str]}]"))
+ASON_FIELDS(TeamThin, (lead,"lead","str"),(workers,"workers","@[{name@str,skills@[str]}]"))
 
 // Dim 26: wide
 struct SrcWide { int64_t f1=0; std::string f2; bool f3=false; int64_t f4=0; std::string f5; bool f6=false; int64_t f7=0; std::string f8; bool f9=false; int64_t f10=0; };
@@ -213,17 +215,17 @@ ASON_FIELDS(VersionB, (id,"id","int"),(name,"name","str"))
 
 // Dim 31: arr in middle
 struct SrcWithArr { int64_t id=0; std::vector<std::string> items; int64_t score=0; };
-ASON_FIELDS(SrcWithArr, (id,"id","int"),(items,"items","[str]"),(score,"score","int"))
+ASON_FIELDS(SrcWithArr, (id,"id","int"),(items,"items","@[str]"),(score,"score","int"))
 
 struct DstWithArrThin { int64_t id=0; std::vector<std::string> items; };
-ASON_FIELDS(DstWithArrThin, (id,"id","int"),(items,"items","[str]"))
+ASON_FIELDS(DstWithArrThin, (id,"id","int"),(items,"items","@[str]"))
 
 // Dim 32: nested struct skip
 struct InnerSkip { int64_t a=0; std::string b; };
 ASON_FIELDS(InnerSkip, (a,"a","int"),(b,"b","str"))
 
 struct SrcWithNested { int64_t id=0; InnerSkip inner; std::string tail; };
-ASON_FIELDS(SrcWithNested, (id,"id","int"),(inner,"inner","{a:int,b:str}"),(tail,"tail","str"))
+ASON_FIELDS(SrcWithNested, (id,"id","int"),(inner,"inner","@{a@int,b@str}"),(tail,"tail","str"))
 
 struct DstFlat { int64_t id=0; };
 ASON_FIELDS(DstFlat, (id,"id","int"))
@@ -244,13 +246,13 @@ struct DetailFull { int64_t id=0; std::string name; int32_t age=0; bool gender=f
 ASON_FIELDS(DetailFull, (id,"ID","int"),(name,"Name","str"),(age,"Age","int"),(gender,"Gender","bool"))
 
 struct UserFull2 { std::vector<DetailFull> details; int64_t code=0; std::string label; };
-ASON_FIELDS(UserFull2, (details,"details","[{ID:int,Name:str,Age:int,Gender:bool}]"),(code,"code","int"),(label,"label","str"))
+ASON_FIELDS(UserFull2, (details,"details","@[{ID@int,Name@str,Age@int,Gender@bool}]"),(code,"code","int"),(label,"label","str"))
 
 struct PersonThin { int64_t id=0; std::string name; };
 ASON_FIELDS(PersonThin, (id,"ID","int"),(name,"Name","str"))
 
 struct HumanThin { std::vector<PersonThin> details; };
-ASON_FIELDS(HumanThin, (details,"details","[{ID:int,Name:str}]"))
+ASON_FIELDS(HumanThin, (details,"details","@[{ID@int,Name@str}]"))
 
 // ============================================================================
 // Tests
@@ -276,8 +278,8 @@ void test_cross_trailing_fields_single() {
     PASS();
 }
 
-void test_cross_skip_trailing_array_map() {
-    TEST(skip_trailing_array_map);
+void test_cross_skip_trailing_collections() {
+    TEST(skip_trailing_collections);
     RichProfile src{1,"Alice",{"go","rust"},{90,85,92}};
     auto data = ason::encode(src);
     auto dst = ason::decode<ThinProfile>(data);
@@ -418,11 +420,11 @@ void test_cross_empty_string() {
     PASS();
 }
 
-void test_cross_skip_map() {
-    TEST(skip_map);
-    SrcWithMap src{1,"Alice",{{"age",30},{"score",95}}};
+void test_cross_skip_entry_list() {
+    TEST(skip_entry_list);
+    SrcWithEntries src{1,"Alice",{{"age",30},{"score",95}}};
     auto data = ason::encode(src);
-    auto dst = ason::decode<DstNoMap>(data);
+    auto dst = ason::decode<DstMetaThin>(data);
     ASSERT_EQ(dst.id, 1); ASSERT_EQ(dst.name, "Alice");
     PASS();
 }
@@ -626,7 +628,7 @@ void test_cross_zero_value() {
 
 void test_matrix_partial_overlap_typed() {
     TEST(matrix_partial_overlap_typed);
-    auto dst = ason::decode<MatrixPart>("{id:int,name:str,score:float,active:bool}:(42,Alice,9.5,true)");
+    auto dst = ason::decode<MatrixPart>("{id@int,name@str,score@float,active@bool}:(42,Alice,9.5,true)");
     ASSERT_EQ(dst.id, 42);
     ASSERT_NEAR(dst.score, 9.5, 1e-10);
     PASS();
@@ -642,7 +644,7 @@ void test_matrix_partial_overlap_untyped() {
 
 void test_matrix_no_overlap_typed() {
     TEST(matrix_no_overlap_typed);
-    auto dst = ason::decode<MatrixNoOverlap>("{id:int,name:str}:(42,Alice)");
+    auto dst = ason::decode<MatrixNoOverlap>("{id@int,name@str}:(42,Alice)");
     ASSERT_EQ(dst.foo, 0);
     ASSERT_EQ(dst.bar, "");
     PASS();
@@ -659,7 +661,7 @@ void test_matrix_no_overlap_untyped() {
 void test_matrix_nested_optional_typed() {
     TEST(matrix_nested_optional_typed);
     auto dst = ason::decode<std::vector<MatrixUserNestedOpt>>(
-        "[{id:int,profile:{name:str,nick:str?,score:float?},active:bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
+        "[{id@int,profile@{name@str,nick@str,score@float},active@bool}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
     ASSERT_EQ(dst.size(), 2u);
     ASSERT_EQ(dst[0].id, 1);
     ASSERT_EQ(dst[0].profile.name, "Alice");
@@ -674,7 +676,7 @@ void test_matrix_nested_optional_typed() {
 void test_matrix_nested_optional_untyped() {
     TEST(matrix_nested_optional_untyped);
     auto dst = ason::decode<std::vector<MatrixUserNestedOpt>>(
-        "[{id,profile:{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
+        "[{id,profile@{name,nick,score},active}]:(1,(Alice,ally,9.5),true),(2,(Bob,,),false)");
     ASSERT_EQ(dst.size(), 2u);
     ASSERT_TRUE(dst[0].profile.nick.has_value());
     ASSERT_EQ(*dst[0].profile.nick, "ally");
@@ -687,7 +689,7 @@ int main() {
 
     test_cross_trailing_fields_vec();
     test_cross_trailing_fields_single();
-    test_cross_skip_trailing_array_map();
+    test_cross_skip_trailing_collections();
     test_cross_nested_fewer_fields();
     test_cross_vec_nested_skip();
     test_cross_deep_3_levels();
@@ -701,7 +703,7 @@ int main() {
     test_cross_float_roundtrip();
     test_cross_negative_skip();
     test_cross_empty_string();
-    test_cross_skip_map();
+    test_cross_skip_entry_list();
     test_cross_typed_vec();
     test_cross_typed_single();
     test_cross_nested_vec_trailing_outer();
