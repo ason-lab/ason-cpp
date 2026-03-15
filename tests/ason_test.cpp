@@ -590,14 +590,14 @@ void test_typed_schema_parse() {
     PASS();
 }
 
-void test_reject_schema_type_aliases() {
-    TEST(reject_schema_type_aliases);
+void test_reject_invalid_schema_types() {
+    TEST(reject_invalid_schema_types);
     for (const auto& input : {
-             std::string("{id@integer,name@str,active@bool}:(42,Hello,false)"),
-             std::string("{id@int,name@string,active@bool}:(42,Hello,false)"),
-             std::string("{id@int,name@str,active@boolean}:(42,Hello,false)"),
-             std::string("{items@[string]}:([Alice])"),
-             std::string("{profile@{name@string}}:((Alice))"),
+             std::string("{id@numx,name@str,active@bool}:(42,Hello,false)"),
+             std::string("{id@int,name@textx,active@bool}:(42,Hello,false)"),
+             std::string("{id@int,name@str,active@flagx}:(42,Hello,false)"),
+             std::string("{items@[textx]}:([Alice])"),
+             std::string("{profile@{name@textx}}:((Alice))"),
          }) {
         bool threw = false;
         try {
@@ -1065,7 +1065,7 @@ int main() {
     test_whitespace();
     test_multiline();
     test_typed_schema_parse();
-    test_reject_schema_type_aliases();
+    test_reject_invalid_schema_types();
     test_schema_field_mismatch();
 
     std::cout << "\n--- Edge cases ---\n";
