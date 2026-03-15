@@ -115,6 +115,16 @@ ASON_FIELDS(WithIntVec, (nums, "nums", "@[int]"))
 struct WithStrVec { std::vector<std::string> tags; };
 ASON_FIELDS(WithStrVec, (tags, "tags", "@[str]"))
 
+struct QuotedSchemaNames {
+    int64_t id_uuid = 0;
+    std::string numeric;
+    bool special = false;
+};
+ASON_FIELDS(QuotedSchemaNames,
+    (id_uuid, "id uuid", "int"),
+    (numeric, "65", "str"),
+    (special, "{}[]@\"", "bool"))
+
 static const AttrEntry* find_attr(const std::vector<AttrEntry>& attrs, const std::string& key) {
     for (const auto& entry : attrs) {
         if (entry.key == key) return &entry;
@@ -208,6 +218,39 @@ void test_optional_dump() {
     ASSERT_TRUE(w2.label.has_value());
     ASSERT_EQ(*w2.label, "hi");
     ASSERT_FALSE(w2.count.has_value());
+    PASS();
+}
+
+void test_quoted_schema_field_names() {
+    TEST(quoted_schema_field_names);
+    QuotedSchemaNames v{1, "Alice", true};
+    auto untyped = ason::encode(v);
+    ASSERT_EQ(untyped, "{\"id uuid\",\"65\",\"{}[]@\\\"\"}:(1,Alice,true)");
+    auto round_untyped = ason::decode<QuotedSchemaNames>(untyped);
+    ASSERT_EQ(round_untyped.id_uuid, 1);
+    ASSERT_EQ(round_untyped.numeric, "Alice");
+    ASSERT_TRUE(round_untyped.special);
+    auto typed = ason::encode_typed(v);
+    ASSERT_EQ(typed, "{\"id uuid\"@int,\"65\"@str,\"{}[]@\\\"\"@bool}:(1,Alice,true)");
+    auto round = ason::decode<QuotedSchemaNames>(typed);
+    ASSERT_EQ(round.id_uuid, 1);
+    ASSERT_EQ(round.numeric, "Alice");
+    ASSERT_TRUE(round.special);
+    auto pretty_untyped = ason::encode_pretty(v);
+    auto round_pretty_untyped = ason::decode<QuotedSchemaNames>(pretty_untyped);
+    ASSERT_EQ(round_pretty_untyped.id_uuid, 1);
+    ASSERT_EQ(round_pretty_untyped.numeric, "Alice");
+    ASSERT_TRUE(round_pretty_untyped.special);
+    auto pretty = ason::encode_pretty_typed(v);
+    auto round_pretty = ason::decode<QuotedSchemaNames>(pretty);
+    ASSERT_EQ(round_pretty.id_uuid, 1);
+    ASSERT_EQ(round_pretty.numeric, "Alice");
+    ASSERT_TRUE(round_pretty.special);
+    auto bin = ason::encode_bin(v);
+    auto round_bin = ason::decode_bin<QuotedSchemaNames>(bin);
+    ASSERT_EQ(round_bin.id_uuid, 1);
+    ASSERT_EQ(round_bin.numeric, "Alice");
+    ASSERT_TRUE(round_bin.special);
     PASS();
 }
 
@@ -1021,6 +1064,7 @@ int main() {
     test_pretty_typed_entry_roundtrip();
     test_pretty_complex_vec_roundtrip();
     test_pretty_deep_nesting_roundtrip();
+    test_quoted_schema_field_names();
 
     std::cout << "\n--- Typed encoding: primitive vec fields ---\n";
     test_encode_typed_bool_vec_field();

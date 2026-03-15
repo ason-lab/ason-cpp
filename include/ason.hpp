@@ -393,6 +393,29 @@ inline void append_str(std::string& buf, std::string_view s) {
     }
 }
 
+inline bool schema_name_needs_quoting(std::string_view s) {
+    if (s.empty()) return true;
+    if (s == "true" || s == "false") return true;
+    if (s.front() == ' ' || s.back() == ' ') return true;
+    bool could_be_number = true;
+    size_t num_start = (s.front() == '-') ? 1 : 0;
+    if (num_start >= s.size()) could_be_number = false;
+    for (size_t i = 0; i < s.size(); i++) {
+        unsigned char b = static_cast<unsigned char>(s[i]);
+        if (b <= 0x20 || b == ',' || b == '@' || b == ':' || b == '{' || b == '}' ||
+            b == '[' || b == ']' || b == '(' || b == ')' || b == '"' || b == '\\')
+            return true;
+        if (could_be_number && i >= num_start && !(std::isdigit(b) || b == '.'))
+            could_be_number = false;
+    }
+    return could_be_number && s.size() > num_start;
+}
+
+inline void append_schema_name(std::string& buf, std::string_view s) {
+    if (schema_name_needs_quoting(s)) append_escaped(buf, s);
+    else buf.append(s.data(), s.size());
+}
+
 // ============================================================================
 // Escape table for serialization
 // ============================================================================
@@ -698,7 +721,7 @@ inline std::string parse_string_value(const char*& pos, const char* end) {
 // Stack-based schema result — zero heap allocation
 struct ParsedSchema {
     static constexpr int MAX_FIELDS = 64;
-    std::string_view fields[MAX_FIELDS];
+    std::string fields[MAX_FIELDS];
     int count = 0;
 };
 
@@ -718,14 +741,22 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
             skip_whitespace(pos, end);
         }
         // Parse field name
-        const char* start = pos;
-        while (pos < end) {
-            char b = *pos;
-            if (b == ',' || b == '}' || b == '@' || b == ':' || b == ' ' || b == '\t') break;
-            pos++;
-        }
-        if (result.count < ParsedSchema::MAX_FIELDS) {
-            result.fields[result.count++] = std::string_view(start, pos - start);
+        if (pos < end && *pos == '"') {
+            if (result.count < ParsedSchema::MAX_FIELDS) {
+                result.fields[result.count++] = parse_quoted_string(pos, end);
+            } else {
+                (void)parse_quoted_string(pos, end);
+            }
+        } else {
+            const char* start = pos;
+            while (pos < end) {
+                char b = *pos;
+                if (b == ',' || b == '}' || b == '@' || b == ':' || b == ' ' || b == '\t') break;
+                pos++;
+            }
+            if (result.count < ParsedSchema::MAX_FIELDS) {
+                result.fields[result.count++] = std::string(start, pos - start);
+            }
         }
         skip_whitespace(pos, end);
         if (pos < end && *pos == ':') {
@@ -1573,7 +1604,7 @@ T decode_bin(std::string_view input) {
 // Per-field schema emission (idx-based, for use with ASON_FOR_EACH)
 #define ASON_SCHEMA_ITEM_1(idx, f) \
     if (idx > 0) buf.push_back(','); \
-    buf.append(ASON_FIELD_NAME f); \
+    ::ason::detail::append_schema_name(buf, ASON_FIELD_NAME f); \
     ::ason::detail::write_field_schema<decltype(std::declval<Self>().ASON_FIELD_MEMBER f)>(buf, typed);
 
 // Per-field dump (idx-based, for use with ASON_FOR_EACH)
