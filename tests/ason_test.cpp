@@ -590,6 +590,26 @@ void test_typed_schema_parse() {
     PASS();
 }
 
+void test_reject_schema_type_aliases() {
+    TEST(reject_schema_type_aliases);
+    for (const auto& input : {
+             std::string("{id@integer,name@str,active@bool}:(42,Hello,false)"),
+             std::string("{id@int,name@string,active@bool}:(42,Hello,false)"),
+             std::string("{id@int,name@str,active@boolean}:(42,Hello,false)"),
+             std::string("{items@[string]}:([Alice])"),
+             std::string("{profile@{name@string}}:((Alice))"),
+         }) {
+        bool threw = false;
+        try {
+            (void)ason::decode<Simple>(input);
+        } catch (...) {
+            threw = true;
+        }
+        if (!threw) { FAIL("expected alias rejection"); return; }
+    }
+    PASS();
+}
+
 void test_schema_field_mismatch() {
     TEST(schema_field_mismatch);
     // Extra field in schema that struct doesn't have — should skip
@@ -1045,6 +1065,7 @@ int main() {
     test_whitespace();
     test_multiline();
     test_typed_schema_parse();
+    test_reject_schema_type_aliases();
     test_schema_field_mismatch();
 
     std::cout << "\n--- Edge cases ---\n";

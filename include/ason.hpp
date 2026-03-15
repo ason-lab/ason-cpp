@@ -729,6 +729,48 @@ struct ParsedSchema {
     int count = 0;
 };
 
+inline ParsedSchema parse_schema(const char*& pos, const char* end);
+
+inline void validate_schema_scalar_type(const char*& pos, const char* end) {
+    const char* start = pos;
+    while (pos < end) {
+        char b = *pos;
+        if (b == ',' || b == '}' || b == ']' || b == ' ' || b == '\t') break;
+        pos++;
+    }
+    std::string token(start, pos - start);
+    if (token.empty()) throw Error("expected schema type after '@'");
+    if (!token.empty() && token.back() == '?') token.pop_back();
+    if (token == "int" || token == "str" || token == "float" || token == "bool") return;
+    throw Error("unsupported schema type '" + token + "'; use int, str, float, or bool");
+}
+
+inline void validate_schema_annotation(const char*& pos, const char* end) {
+    if (pos >= end) throw Error("expected schema type after '@'");
+    if (*pos == '{') {
+        (void)parse_schema(pos, end);
+        return;
+    }
+    if (*pos == '[') {
+        pos++;
+        skip_whitespace(pos, end);
+        if (pos < end && *pos == ']') {
+            pos++;
+            return;
+        }
+        if (pos < end && *pos == '{') {
+            (void)parse_schema(pos, end);
+        } else {
+            validate_schema_scalar_type(pos, end);
+        }
+        skip_whitespace(pos, end);
+        if (pos >= end || *pos != ']') throw Error("expected ']' in array type annotation");
+        pos++;
+        return;
+    }
+    validate_schema_scalar_type(pos, end);
+}
+
 // Parse schema: {field1,field2,...} or {field1@type1,...}
 // Returns field names as string_views (zero-copy, no heap allocation).
 inline ParsedSchema parse_schema(const char*& pos, const char* end) {
@@ -766,29 +808,11 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
         if (pos < end && *pos == ':') {
             throw Error("legacy ':' field annotations are not supported; use '@'");
         }
-        // Skip optional annotation after '@'
+        // Validate and skip optional annotation after '@'
         if (pos < end && *pos == '@') {
             pos++;
             skip_whitespace(pos, end);
-            if (pos < end && (*pos == '{' || *pos == '[')) {
-                std::vector<char> stack;
-                while (pos < end) {
-                    char ch = *pos;
-                    if (ch == '{') stack.push_back('}');
-                    else if (ch == '[') stack.push_back(']');
-                    else if (!stack.empty() && ch == stack.back()) {
-                        stack.pop_back();
-                        if (stack.empty()) { pos++; break; }
-                    }
-                    pos++;
-                }
-            } else {
-                while (pos < end) {
-                    char b = *pos;
-                    if (b == ',' || b == '}' || b == ' ' || b == '\t') break;
-                    pos++;
-                }
-            }
+            validate_schema_annotation(pos, end);
         }
     }
     return result;
