@@ -463,6 +463,12 @@ void test_string_needs_quoting() {
     StringOnly s3{"12345"};
     auto str3 = ason::encode(s3);
     ASSERT_TRUE(str3.find("\"12345\"") != std::string::npos);
+
+    StringOnly s4{"@Alice"};
+    auto str4 = ason::encode(s4);
+    ASSERT_TRUE(str4.find("\"@Alice\"") != std::string::npos);
+    auto s4b = ason::decode<StringOnly>(str4);
+    ASSERT_EQ(s4b.val, "@Alice");
     PASS();
 }
 

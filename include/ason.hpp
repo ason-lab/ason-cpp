@@ -102,9 +102,10 @@ inline size_t find_quote_or_special(const uint8_t* ptr, size_t len) {
 
 // Check if any byte in s needs quoting (control chars, structural chars)
 inline bool has_special_chars(const uint8_t* ptr, size_t len) {
-    // Structural: , ( ) [ ] < > : " \ and control < 0x20
+    // Structural: , @ ( ) [ ] < > : " \ and control < 0x20
     size_t i = 0;
     uint8x16_t vcomma = vdupq_n_u8(',');
+    uint8x16_t vat    = vdupq_n_u8('@');
     uint8x16_t vlp    = vdupq_n_u8('(');
     uint8x16_t vrp    = vdupq_n_u8(')');
     uint8x16_t vlb    = vdupq_n_u8('[');
@@ -119,6 +120,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         uint8x16_t chunk = vld1q_u8(ptr + i);
         uint8x16_t r = vcleq_u8(chunk, vctrl);
         r = vorrq_u8(r, vceqq_u8(chunk, vcomma));
+        r = vorrq_u8(r, vceqq_u8(chunk, vat));
         r = vorrq_u8(r, vceqq_u8(chunk, vlp));
         r = vorrq_u8(r, vceqq_u8(chunk, vrp));
         r = vorrq_u8(r, vceqq_u8(chunk, vlb));
@@ -132,7 +134,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     }
     for (; i < len; i++) {
         uint8_t b = ptr[i];
-        if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
+        if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
             b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
@@ -167,6 +169,7 @@ inline size_t find_quote_or_special(const uint8_t* ptr, size_t len) {
 inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     size_t i = 0;
     __m128i vcomma  = _mm_set1_epi8(',');
+    __m128i vat     = _mm_set1_epi8('@');
     __m128i vlp     = _mm_set1_epi8('(');
     __m128i vrp     = _mm_set1_epi8(')');
     __m128i vlb     = _mm_set1_epi8('[');
@@ -182,6 +185,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         __m128i mx = _mm_max_epu8(chunk, vctrl);
         __m128i r = _mm_cmpeq_epi8(mx, vctrl);
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vcomma));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vat));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vlp));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrp));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vlb));
@@ -195,7 +199,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     }
     for (; i < len; i++) {
         uint8_t b = ptr[i];
-        if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
+        if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
             b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
@@ -215,7 +219,7 @@ inline size_t find_quote_or_special(const uint8_t* ptr, size_t len) {
 inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (size_t i = 0; i < len; i++) {
         uint8_t b = ptr[i];
-        if (b < 0x20 || b == ',' || b == '(' || b == ')' ||
+        if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
             b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
