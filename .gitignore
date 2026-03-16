@@ -4,6 +4,8 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 CTestTestfile.cmake
+Testing/
+install_manifest.txt
 Makefile
 *_test
 
@@ -11,4 +13,21 @@ Makefile
 *.o
 *.a
 *.so
+*.dylib
+*.dll
+*.lib
+*.obj
+*.exe
 *.out
+
+# Python / Conan helper caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.conan/
+.conan2/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

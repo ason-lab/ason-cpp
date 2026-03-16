@@ -127,6 +127,37 @@ cmake --build build
 ctest --test-dir build
 ```
 
+## Package Manager Readiness
+
+`ason-cpp` can now be consumed as a standard header-only CMake package:
+
+```cmake
+find_package(ason CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE ason::ason)
+```
+
+### Conan
+
+The repository ships a ready-to-use [conanfile.py](conanfile.py).
+
+```bash
+cd ason-cpp
+conan create . --build=missing
+```
+
+### vcpkg
+
+An overlay port is included under [vcpkg/ports/ason-cpp](vcpkg/ports/ason-cpp).
+
+```bash
+vcpkg install ason-cpp --overlay-ports=/path/to/ason-cpp/vcpkg/ports
+```
+
+### Homebrew
+
+A formula template is included at [homebrew/ason-cpp.rb](homebrew/ason-cpp.rb).
+Before publishing to a tap, replace `REPLACE_WITH_RELEASE_SHA256` with the actual release tarball hash.
+
 ## Latest Benchmarks
 
 Measured on this machine with:

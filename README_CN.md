@@ -127,6 +127,37 @@ cmake --build build
 ctest --test-dir build
 ```
 
+## 包管理器接入
+
+`ason-cpp` 现在可以作为标准的 header-only CMake package 使用：
+
+```cmake
+find_package(ason CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE ason::ason)
+```
+
+### Conan
+
+仓库内已经提供可直接使用的 [conanfile.py](conanfile.py)。
+
+```bash
+cd ason-cpp
+conan create . --build=missing
+```
+
+### vcpkg
+
+仓库内已经提供 overlay port，位置在 [vcpkg/ports/ason-cpp](vcpkg/ports/ason-cpp)。
+
+```bash
+vcpkg install ason-cpp --overlay-ports=/path/to/ason-cpp/vcpkg/ports
+```
+
+### Homebrew
+
+仓库内已经提供 formula 模板 [homebrew/ason-cpp.rb](homebrew/ason-cpp.rb)。
+正式发布到 tap 前，需要把里面的 `REPLACE_WITH_RELEASE_SHA256` 替换成真实 release tarball 的 `sha256`。
+
 ## 最新基准
 
 在当前这台机器上通过下面命令实测：
