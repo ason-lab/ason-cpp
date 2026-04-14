@@ -1,18 +1,18 @@
-class AsonCpp < Formula
-  desc "Header-only C++17 ASON (Array-Schema Object Notation) library"
-  homepage "https://github.com/ason-lab/ason/tree/main/ason-cpp"
-  url "https://github.com/ason-lab/ason/archive/refs/tags/v1.0.0.tar.gz"
+class AsunCpp < Formula
+  desc "Header-only C++17 ASUN (Array-Schema Unified Notation) library"
+  homepage "https://github.com/asun-lab/asun/tree/main/asun-cpp"
+  url "https://github.com/asun-lab/asun/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_SHA256"
   license "MIT"
-  head "https://github.com/ason-lab/ason.git", branch: "main"
+  head "https://github.com/asun-lab/asun.git", branch: "main"
 
   depends_on "cmake" => :build
 
   def install
-    system "cmake", "-S", "ason-cpp", "-B", "build",
+    system "cmake", "-S", "asun-cpp", "-B", "build",
                     "-DCMAKE_BUILD_TYPE=Release",
-                    "-DASON_BUILD_EXAMPLES=OFF",
-                    "-DASON_BUILD_TESTS=OFF",
+                    "-DASUN_BUILD_EXAMPLES=OFF",
+                    "-DASUN_BUILD_TESTS=OFF",
                     *std_cmake_args
     system "cmake", "--build", "build"
     system "cmake", "--install", "build"
@@ -20,7 +20,7 @@ class AsonCpp < Formula
 
   test do
     (testpath/"test.cpp").write <<~CPP
-      #include <ason.hpp>
+      #include <asun.hpp>
       #include <string>
       #include <vector>
       #include <cstdint>
@@ -31,15 +31,15 @@ class AsonCpp < Formula
           bool active = false;
       };
 
-      ASON_FIELDS(User,
+      ASUN_FIELDS(User,
           (id, "id", "int"),
           (name, "name", "str"),
           (active, "active", "bool"))
 
       int main() {
           std::vector<User> rows = {{1, "Alice", true}, {2, "Bob", false}};
-          auto text = ason::encode_typed(rows);
-          auto out = ason::decode<std::vector<User>>(text);
+          auto text = asun::encode_typed(rows);
+          auto out = asun::decode<std::vector<User>>(text);
           return out.size() == 2 ? 0 : 1;
       }
     CPP

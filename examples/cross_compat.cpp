@@ -1,4 +1,4 @@
-#include "ason.hpp"
+#include "asun.hpp"
 #include <iostream>
 #include <vector>
 
@@ -9,13 +9,13 @@ struct Detail {
     bool gender;
 };
 
-ASON_FIELDS(Detail, (id, "ID", "int"), (name, "Name", "str"), (age, "Age", "int"), (gender, "Gender", "bool"))
+ASUN_FIELDS(Detail, (id, "ID", "int"), (name, "Name", "str"), (age, "Age", "int"), (gender, "Gender", "bool"))
 
 struct User {
     std::vector<Detail> details;
 };
 
-ASON_FIELDS(User, (details, "details", "[{ID@int,Name@str,Age@int,Gender@bool}]"))
+ASUN_FIELDS(User, (details, "details", "[{ID@int,Name@str,Age@int,Gender@bool}]"))
 
 struct Person {
     int64_t id;
@@ -23,13 +23,13 @@ struct Person {
     int32_t age;
 };
 
-ASON_FIELDS(Person, (id, "ID", "int"), (name, "Name", "str"), (age, "Age", "int"))
+ASUN_FIELDS(Person, (id, "ID", "int"), (name, "Name", "str"), (age, "Age", "int"))
 
 struct Human {
     std::vector<Person> details;
 };
 
-ASON_FIELDS(Human, (details, "details", "[{ID@int,Name@str,Age@int}]"))
+ASUN_FIELDS(Human, (details, "details", "[{ID@int,Name@str,Age@int}]"))
 
 int main() {
     std::vector<User> users = {
@@ -42,11 +42,11 @@ int main() {
     };
 
     // Encode
-    auto ason_str = ason::encode(users);
-    std::cout << "Encoded ASON:\n" << ason_str << std::endl;
+    auto asun_str = asun::encode(users);
+    std::cout << "Encoded ASUN:\n" << asun_str << std::endl;
 
     // Decode into Human
-    auto decoded = ason::decode<std::vector<Human>>(ason_str);
+    auto decoded = asun::decode<std::vector<Human>>(asun_str);
     std::cout << "\nDecoded into Human list:\n";
     for (const auto& h : decoded) {
         std::cout << "Human{details=[";

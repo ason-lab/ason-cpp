@@ -1,21 +1,21 @@
-# ason-cpp
+# asun-cpp
 
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 [![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Header-only C++17 support for [ASON](https://github.com/ason-lab/ason), a schema-driven data format for compact structured payloads.
+Header-only C++17 support for [ASUN](https://github.com/asun-lab/asun), a schema-driven data format for compact structured payloads.
 
 [中文文档](README_CN.md)
 
-## Why ASON
+## Why ASUN
 
-ASON writes the schema once and stores repeated rows as tuples:
+ASUN writes the schema once and stores repeated rows as tuples:
 
 ```json
 [
-  {"id": 1, "name": "Alice", "active": true},
-  {"id": 2, "name": "Bob", "active": false}
+  { "id": 1, "name": "Alice", "active": true },
+  { "id": 2, "name": "Bob", "active": false }
 ]
 ```
 
@@ -27,7 +27,7 @@ That cuts repeated keys, reduces payload size, and keeps typed structure visible
 
 ## Highlights
 
-- Header-only, just `#include "ason.hpp"`
+- Header-only, just `#include "asun.hpp"`
 - Current API uses `encode` / `decode`, not the older `dump` / `load` names
 - Text and binary formats
 - SIMD-aware parser and zero-copy-friendly decoding
@@ -36,7 +36,7 @@ That cuts repeated keys, reduces payload size, and keeps typed structure visible
 ## Quick Start
 
 ```cpp
-#include "ason.hpp"
+#include "asun.hpp"
 
 struct User {
   int64_t id = 0;
@@ -44,7 +44,7 @@ struct User {
   bool active = false;
 };
 
-ASON_FIELDS(User,
+ASUN_FIELDS(User,
     (id, "id", "int"),
     (name, "name", "str"),
     (active, "active", "bool"))
@@ -55,18 +55,18 @@ ASON_FIELDS(User,
 ```cpp
 User user{1, "Alice", true};
 
-std::string text = ason::encode(user);
+std::string text = asun::encode(user);
 // {id,name,active}:(1,Alice,true)
 
-std::string typed = ason::encode_typed(user);
+std::string typed = asun::encode_typed(user);
 // {id@int,name@str,active@bool}:(1,Alice,true)
 
-User decoded = ason::decode<User>(text);
+User decoded = asun::decode<User>(text);
 ```
 
 ### Modeling key-value collections
 
-ASON C++ no longer provides a native map/dictionary field syntax.
+ASUN C++ no longer provides a native map/dictionary field syntax.
 Model key-value data as arrays of entry structs instead:
 
 ```cpp
@@ -75,7 +75,7 @@ struct EnvEntry {
   std::string value;
 };
 
-ASON_FIELDS(EnvEntry,
+ASUN_FIELDS(EnvEntry,
     (key, "key", "str"),
     (value, "value", "str"))
 
@@ -92,29 +92,29 @@ std::vector<User> users = {
     {2, "Bob", false},
 };
 
-auto text = ason::encode(users);
+auto text = asun::encode(users);
 // [{id,name,active}]:(1,Alice,true),(2,Bob,false)
 
-auto typed = ason::encode_typed(users);
-auto decoded = ason::decode<std::vector<User>>(text);
+auto typed = asun::encode_typed(users);
+auto decoded = asun::decode<std::vector<User>>(text);
 ```
 
 ### Binary roundtrip
 
 ```cpp
-std::string bin = ason::encode_bin(user);
-User decoded = ason::decode_bin<User>(bin);
+std::string bin = asun::encode_bin(user);
+User decoded = asun::decode_bin<User>(bin);
 ```
 
 ## Current API
 
-| Function | Purpose |
-| --- | --- |
-| `ason::encode` / `ason::encode_typed` | Encode to text |
-| `ason::decode<T>` | Decode from text |
-| `ason::encode_pretty` / `ason::encode_pretty_typed` | Pretty text output |
-| `ason::encode_bin` | Encode to binary |
-| `ason::decode_bin<T>` | Decode from binary |
+| Function                                            | Purpose            |
+| --------------------------------------------------- | ------------------ |
+| `asun::encode` / `asun::encode_typed`               | Encode to text     |
+| `asun::decode<T>`                                   | Decode from text   |
+| `asun::encode_pretty` / `asun::encode_pretty_typed` | Pretty text output |
+| `asun::encode_bin`                                  | Encode to binary   |
+| `asun::decode_bin<T>`                               | Decode from binary |
 
 ## Build and Run
 
@@ -129,11 +129,11 @@ ctest --test-dir build
 
 ## Package Manager Readiness
 
-`ason-cpp` can now be consumed as a standard header-only CMake package:
+`asun-cpp` can now be consumed as a standard header-only CMake package:
 
 ```cmake
-find_package(ason CONFIG REQUIRED)
-target_link_libraries(your_target PRIVATE ason::ason)
+find_package(asun CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE asun::asun)
 ```
 
 ### Conan
@@ -141,21 +141,21 @@ target_link_libraries(your_target PRIVATE ason::ason)
 The repository ships a ready-to-use [conanfile.py](conanfile.py).
 
 ```bash
-cd ason-cpp
+cd asun-cpp
 conan create . --build=missing
 ```
 
 ### vcpkg
 
-An overlay port is included under [vcpkg/ports/ason-cpp](vcpkg/ports/ason-cpp).
+An overlay port is included under [vcpkg/ports/asun-cpp](vcpkg/ports/asun-cpp).
 
 ```bash
-vcpkg install ason-cpp --overlay-ports=/path/to/ason-cpp/vcpkg/ports
+vcpkg install asun-cpp --overlay-ports=/path/to/asun-cpp/vcpkg/ports
 ```
 
 ### Homebrew
 
-A formula template is included at [homebrew/ason-cpp.rb](homebrew/ason-cpp.rb).
+A formula template is included at [homebrew/asun-cpp.rb](homebrew/asun-cpp.rb).
 Before publishing to a tap, replace `REPLACE_WITH_RELEASE_SHA256` with the actual release tarball hash.
 
 ## Latest Benchmarks
@@ -168,12 +168,12 @@ Measured on this machine with:
 
 Headline numbers:
 
-- Flat 1,000-record dataset: ASON text serialize `11.66ms` vs JSON `29.05ms`, deserialize `34.63ms` vs JSON `44.75ms`
-- Throughput summary: ASON text was `2.49x` faster than JSON for serialize and `1.29x` faster for deserialize
-- Size summary for 1,000 flat records: JSON `121,675 B`, ASON text `56,718 B` (`53%` smaller), ASON binary `74,454 B` (`39%` smaller)
+- Flat 1,000-record dataset: ASUN text serialize `11.66ms` vs JSON `29.05ms`, deserialize `34.63ms` vs JSON `44.75ms`
+- Throughput summary: ASUN text was `2.49x` faster than JSON for serialize and `1.29x` faster for deserialize
+- Size summary for 1,000 flat records: JSON `121,675 B`, ASUN text `56,718 B` (`53%` smaller), ASUN binary `74,454 B` (`39%` smaller)
 - Binary decode was especially strong: `5.97ms` vs JSON `44.75ms` on flat 1,000-record data, or `7.50x` faster
 
-For 100 deep company objects, ASON text serialized `170,183 B` vs JSON `431,612 B` and decoded `2.45x` faster.
+For 100 deep company objects, ASUN text serialized `170,183 B` vs JSON `431,612 B` and decoded `2.45x` faster.
 
 ## Contributors
 

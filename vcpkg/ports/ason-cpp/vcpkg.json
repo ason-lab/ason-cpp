@@ -1,8 +1,0 @@
-{
-  "name": "ason-cpp",
-  "version-string": "1.0.0",
-  "description": "Header-only C++17 ASON (Array-Schema Object Notation) library",
-  "homepage": "https://github.com/ason-lab/ason/tree/main/ason-cpp",
-  "license": "MIT",
-  "dependencies": []
-}

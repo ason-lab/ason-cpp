@@ -1,4 +1,4 @@
-#include "ason.hpp"
+#include "asun.hpp"
 #include <cassert>
 #include <iostream>
 
@@ -9,7 +9,7 @@
 struct Department {
   std::string title;
 };
-ASON_FIELDS(Department, (title, "title", "str"))
+ASUN_FIELDS(Department, (title, "title", "str"))
 
 struct Employee {
   int64_t id = 0;
@@ -18,7 +18,7 @@ struct Employee {
   std::vector<std::string> skills;
   bool active = false;
 };
-ASON_FIELDS(Employee, (id, "id", "int"), (name, "name", "str"),
+ASUN_FIELDS(Employee, (id, "id", "int"), (name, "name", "str"),
             (dept, "dept", "@{title@str}"), (skills, "skills", "@[str]"),
             (active, "active", "bool"))
 
@@ -26,26 +26,26 @@ struct AttrEntry {
   std::string key;
   int64_t value = 0;
 };
-ASON_FIELDS(AttrEntry, (key, "key", "str"), (value, "value", "int"))
+ASUN_FIELDS(AttrEntry, (key, "key", "str"), (value, "value", "int"))
 
 struct WithEntries {
   std::string name;
   std::vector<AttrEntry> attrs;
 };
-ASON_FIELDS(WithEntries, (name, "name", "str"),
+ASUN_FIELDS(WithEntries, (name, "name", "str"),
             (attrs, "attrs", "@[{key@str,value@int}]"))
 
 struct Address {
   std::string city;
   int64_t zip = 0;
 };
-ASON_FIELDS(Address, (city, "city", "str"), (zip, "zip", "int"))
+ASUN_FIELDS(Address, (city, "city", "str"), (zip, "zip", "int"))
 
 struct Nested {
   std::string name;
   Address addr;
 };
-ASON_FIELDS(Nested, (name, "name", "str"), (addr, "addr", "@{city@str,zip@int}"))
+ASUN_FIELDS(Nested, (name, "name", "str"), (addr, "addr", "@{city@str,zip@int}"))
 
 // ===========================================================================
 // All-types struct
@@ -70,7 +70,7 @@ struct AllTypes {
   std::vector<std::string> vec_str;
   std::vector<std::vector<int64_t>> nested_vec;
 };
-ASON_FIELDS(AllTypes, (b, "b", "bool"), (i8v, "i8v", "int"),
+ASUN_FIELDS(AllTypes, (b, "b", "bool"), (i8v, "i8v", "int"),
             (i16v, "i16v", "int"), (i32v, "i32v", "int"), (i64v, "i64v", "int"),
             (u8v, "u8v", "int"), (u16v, "u16v", "int"), (u32v, "u32v", "int"),
             (u64v, "u64v", "int"), (f32v, "f32v", "float"),
@@ -89,7 +89,7 @@ struct Building {
   bool residential = false;
   double height_m = 0;
 };
-ASON_FIELDS(Building, (name, "name", "str"), (floors, "floors", "int"),
+ASUN_FIELDS(Building, (name, "name", "str"), (floors, "floors", "int"),
             (residential, "residential", "bool"),
             (height_m, "height_m", "float"))
 
@@ -98,7 +98,7 @@ struct Street {
   double length_km = 0;
   std::vector<Building> buildings;
 };
-ASON_FIELDS(Street, (name, "name", "str"), (length_km, "length_km", "float"),
+ASUN_FIELDS(Street, (name, "name", "str"), (length_km, "length_km", "float"),
             (buildings, "buildings",
              "@[{name@str,floors@int,residential@bool,height_m@float}]"))
 
@@ -107,7 +107,7 @@ struct District {
   int64_t population = 0;
   std::vector<Street> streets;
 };
-ASON_FIELDS(District, (name, "name", "str"), (population, "population", "int"),
+ASUN_FIELDS(District, (name, "name", "str"), (population, "population", "int"),
             (streets, "streets", "@[{name@str,length_km@float,buildings}]"))
 
 struct City {
@@ -116,7 +116,7 @@ struct City {
   double area_km2 = 0;
   std::vector<District> districts;
 };
-ASON_FIELDS(City, (name, "name", "str"), (population, "population", "int"),
+ASUN_FIELDS(City, (name, "name", "str"), (population, "population", "int"),
             (area_km2, "area_km2", "float"),
             (districts, "districts", "@[{name@str,population@int,streets}]"))
 
@@ -124,7 +124,7 @@ struct Region {
   std::string name;
   std::vector<City> cities;
 };
-ASON_FIELDS(Region, (name, "name", "str"),
+ASUN_FIELDS(Region, (name, "name", "str"),
             (cities, "cities",
              "@[{name@str,population@int,area_km2@float,districts}]"))
 
@@ -135,7 +135,7 @@ struct Country {
   double gdp_trillion = 0;
   std::vector<Region> regions;
 };
-ASON_FIELDS(Country, (name, "name", "str"), (code, "code", "str"),
+ASUN_FIELDS(Country, (name, "name", "str"), (code, "code", "str"),
             (population, "population", "int"),
             (gdp_trillion, "gdp_trillion", "float"),
             (regions, "regions", "@[{name@str,cities}]"))
@@ -150,21 +150,21 @@ struct State {
   std::string capital;
   int64_t population = 0;
 };
-ASON_FIELDS(State, (name, "name", "str"), (capital, "capital", "str"),
+ASUN_FIELDS(State, (name, "name", "str"), (capital, "capital", "str"),
             (population, "population", "int"))
 
 struct Nation {
   std::string name;
   std::vector<State> states;
 };
-ASON_FIELDS(Nation, (name, "name", "str"),
+ASUN_FIELDS(Nation, (name, "name", "str"),
             (states, "states", "@[{name@str,capital@str,population@int}]"))
 
 struct Continent {
   std::string name;
   std::vector<Nation> nations;
 };
-ASON_FIELDS(Continent, (name, "name", "str"),
+ASUN_FIELDS(Continent, (name, "name", "str"),
             (nations, "nations", "@[{name@str,states}]"))
 
 struct Planet {
@@ -173,7 +173,7 @@ struct Planet {
   bool has_life = false;
   std::vector<Continent> continents;
 };
-ASON_FIELDS(Planet, (name, "name", "str"), (radius_km, "radius_km", "float"),
+ASUN_FIELDS(Planet, (name, "name", "str"), (radius_km, "radius_km", "float"),
             (has_life, "has_life", "bool"),
             (continents, "continents", "@[{name@str,nations}]"))
 
@@ -182,7 +182,7 @@ struct SolarSystem {
   std::string star_type;
   std::vector<Planet> planets;
 };
-ASON_FIELDS(SolarSystem, (name, "name", "str"), (star_type, "star_type", "str"),
+ASUN_FIELDS(SolarSystem, (name, "name", "str"), (star_type, "star_type", "str"),
             (planets, "planets",
              "@[{name@str,radius_km@float,has_life@bool,continents}]"))
 
@@ -191,7 +191,7 @@ struct Galaxy {
   double star_count_billions = 0;
   std::vector<SolarSystem> systems;
 };
-ASON_FIELDS(Galaxy, (name, "name", "str"),
+ASUN_FIELDS(Galaxy, (name, "name", "str"),
             (star_count_billions, "star_count_billions", "float"),
             (systems, "systems", "@[{name@str,star_type@str,planets}]"))
 
@@ -200,7 +200,7 @@ struct Universe {
   double age_billion_years = 0;
   std::vector<Galaxy> galaxies;
 };
-ASON_FIELDS(Universe, (name, "name", "str"),
+ASUN_FIELDS(Universe, (name, "name", "str"),
             (age_billion_years, "age_billion_years", "float"),
             (galaxies, "galaxies",
              "@[{name@str,star_count_billions@float,systems}]"))
@@ -216,7 +216,7 @@ struct DbConfig {
   bool ssl = false;
   double timeout_ms = 0;
 };
-ASON_FIELDS(DbConfig, (host, "host", "str"), (port, "port", "int"),
+ASUN_FIELDS(DbConfig, (host, "host", "str"), (port, "port", "int"),
             (max_connections, "max_connections", "int"), (ssl, "ssl", "bool"),
             (timeout_ms, "timeout_ms", "float"))
 
@@ -225,7 +225,7 @@ struct CacheConfig {
   int64_t ttl_seconds = 0;
   int64_t max_size_mb = 0;
 };
-ASON_FIELDS(CacheConfig, (enabled, "enabled", "bool"),
+ASUN_FIELDS(CacheConfig, (enabled, "enabled", "bool"),
             (ttl_seconds, "ttl_seconds", "int"),
             (max_size_mb, "max_size_mb", "int"))
 
@@ -234,14 +234,14 @@ struct LogConfig {
   std::optional<std::string> file;
   bool rotate = false;
 };
-ASON_FIELDS(LogConfig, (level, "level", "str"), (file, "file", "str"),
+ASUN_FIELDS(LogConfig, (level, "level", "str"), (file, "file", "str"),
             (rotate, "rotate", "bool"))
 
 struct StringEntry {
   std::string key;
   std::string value;
 };
-ASON_FIELDS(StringEntry, (key, "key", "str"), (value, "value", "str"))
+ASUN_FIELDS(StringEntry, (key, "key", "str"), (value, "value", "str"))
 
 struct ServiceConfig {
   std::string name;
@@ -252,7 +252,7 @@ struct ServiceConfig {
   std::vector<std::string> features;
   std::vector<StringEntry> env;
 };
-ASON_FIELDS(
+ASUN_FIELDS(
     ServiceConfig, (name, "name", "str"), (version, "version", "str"),
     (db, "db",
      "@{host@str,port@int,max_connections@int,ssl@bool,timeout_ms@float}"),
@@ -272,14 +272,14 @@ template <typename T> void print_field(const char *label, const T &v) {
 struct Note {
   std::string text;
 };
-ASON_FIELDS(Note, (text, "text", "str"))
+ASUN_FIELDS(Note, (text, "text", "str"))
 
 struct Measurement {
   int64_t id = 0;
   double value = 0;
   std::string label;
 };
-ASON_FIELDS(Measurement, (id, "id", "int"), (value, "value", "float"),
+ASUN_FIELDS(Measurement, (id, "id", "int"), (value, "value", "float"),
             (label, "label", "str"))
 
 struct Nums {
@@ -287,29 +287,29 @@ struct Nums {
   double b = 0;
   int64_t c = 0;
 };
-ASON_FIELDS(Nums, (a, "a", "int"), (b, "b", "float"), (c, "c", "int"))
+ASUN_FIELDS(Nums, (a, "a", "int"), (b, "b", "float"), (c, "c", "int"))
 
 struct WithVec {
   std::vector<int64_t> items;
 };
-ASON_FIELDS(WithVec, (items, "items", "@[int]"))
+ASUN_FIELDS(WithVec, (items, "items", "@[int]"))
 
 struct Special {
   std::string val;
 };
-ASON_FIELDS(Special, (val, "val", "str"))
+ASUN_FIELDS(Special, (val, "val", "str"))
 
 struct Matrix3D {
   std::vector<std::vector<std::vector<int64_t>>> data;
 };
-ASON_FIELDS(Matrix3D, (data, "data", "@[[[int]]]"))
+ASUN_FIELDS(Matrix3D, (data, "data", "@[[[int]]]"))
 
 int main() {
-  std::cout << "=== ASON Complex Examples (C++) ===\n\n";
+  std::cout << "=== ASUN Complex Examples (C++) ===\n\n";
 
   // 1. Nested struct
   std::cout << "1. Nested struct:\n";
-  auto emp = ason::decode<Employee>(
+  auto emp = asun::decode<Employee>(
       "{id,name,dept@{title},skills,active}:(1,Alice,(Manager),[rust],true)");
   std::cout << "   Employee{id=" << emp.id << ", name=" << emp.name
             << ", dept=" << emp.dept.title << ", skills=[";
@@ -327,13 +327,13 @@ int main() {
       "  (1, Alice, (Manager), [Rust, Go], true),\n"
       "  (2, Bob, (Engineer), [Python], false),\n"
       "  (3, \"Carol Smith\", (Director), [Leadership, Strategy], true)");
-  auto employees = ason::decode<std::vector<Employee>>(input2);
+  auto employees = asun::decode<std::vector<Employee>>(input2);
   for (auto &e : employees)
     std::cout << "   Employee{id=" << e.id << ", name=" << e.name << "}\n";
 
   // 3. Entry-list field
   std::cout << "\n3. Entry-list field:\n";
-  auto wm = ason::decode<WithEntries>(
+  auto wm = asun::decode<WithEntries>(
       "{name,attrs@[{key,value}]}:(Alice,[(age,30),(score,95)])");
   std::cout << "   name=" << wm.name << ", attrs=[";
   for (const auto &entry : wm.attrs)
@@ -347,9 +347,9 @@ int main() {
   // 4. Nested struct roundtrip
   std::cout << "\n4. Nested struct roundtrip:\n";
   Nested nested{"Alice", {"NYC", 10001}};
-  auto s4 = ason::encode(nested);
+  auto s4 = asun::encode(nested);
   std::cout << "   serialized:   " << s4 << "\n";
-  auto deserialized4 = ason::decode<Nested>(s4);
+  auto deserialized4 = asun::decode<Nested>(s4);
   assert(deserialized4.name == "Alice");
   assert(deserialized4.addr.city == "NYC");
   assert(deserialized4.addr.zip == 10001);
@@ -358,27 +358,27 @@ int main() {
   // 5. Escaped strings
   std::cout << "\n5. Escaped strings:\n";
   Note note{"say \"hi\", then (wave)\tnewline\nend"};
-  auto s5 = ason::encode(note);
+  auto s5 = asun::encode(note);
   std::cout << "   serialized:   " << s5 << "\n";
-  auto note2 = ason::decode<Note>(s5);
+  auto note2 = asun::decode<Note>(s5);
   assert(note.text == note2.text);
   std::cout << "   ✓ escape roundtrip OK\n";
 
   // 6. Float fields
   std::cout << "\n6. Float fields:\n";
   Measurement m{2, 95.0, "score"};
-  auto s6 = ason::encode(m);
+  auto s6 = asun::encode(m);
   std::cout << "   serialized: " << s6 << "\n";
-  auto m2 = ason::decode<Measurement>(s6);
+  auto m2 = asun::decode<Measurement>(s6);
   assert(m2.id == 2 && m2.value == 95.0 && m2.label == "score");
   std::cout << "   ✓ float roundtrip OK\n";
 
   // 7. Negative numbers
   std::cout << "\n7. Negative numbers:\n";
   Nums n{-42, -3.15, -9223372036854775807LL};
-  auto s7 = ason::encode(n);
+  auto s7 = asun::encode(n);
   std::cout << "   serialized:   " << s7 << "\n";
-  auto n2 = ason::decode<Nums>(s7);
+  auto n2 = asun::decode<Nums>(s7);
   assert(n2.a == -42 && n2.c == -9223372036854775807LL);
   std::cout << "   ✓ negative roundtrip OK\n";
 
@@ -403,9 +403,9 @@ int main() {
   all.vec_str = {"alpha", "beta gamma", "delta"};
   all.nested_vec = {{1, 2}, {3, 4, 5}};
 
-  auto s8 = ason::encode(all);
+  auto s8 = asun::encode(all);
   std::cout << "   serialized (" << s8.size() << " bytes):\n   " << s8 << "\n";
-  auto all2 = ason::decode<AllTypes>(s8);
+  auto all2 = asun::decode<AllTypes>(s8);
   assert(all2.b == all.b);
   assert(all2.i64v == all.i64v);
   assert(all2.u64v == all.u64v);
@@ -485,7 +485,7 @@ int main() {
                           }},
                  }},
       }};
-  auto s10 = ason::encode(country);
+  auto s10 = asun::encode(country);
   std::cout << "   serialized (" << s10.size() << " bytes)\n";
   std::cout << "   first 200 chars: " << s10.substr(0, 200) << "...\n";
   assert(country2.name == "Rustland");
@@ -493,15 +493,15 @@ int main() {
   assert(
       country2.regions[0].cities[0].districts[0].streets[0].buildings[0].name ==
       "Tower A");
-  std::cout << "   ✓ 5-level ASON-text roundtrip OK\n";
+  std::cout << "   ✓ 5-level ASUN-text roundtrip OK\n";
 
-  // ASON binary roundtrip
-  auto bin10 = ason::encode_bin(country);
-  auto country_bin = ason::decode_bin<Country>(bin10);
+  // ASUN binary roundtrip
+  auto bin10 = asun::encode_bin(country);
+  auto country_bin = asun::decode_bin<Country>(bin10);
   assert(country_bin.name == "Rustland");
-  std::cout << "   ✓ 5-level ASON-bin roundtrip OK\n";
-  std::cout << "   ASON text: " << s10.size()
-            << " B | ASON bin: " << bin10.size() << " B\n";
+  std::cout << "   ✓ 5-level ASUN-bin roundtrip OK\n";
+  std::cout << "   ASUN text: " << s10.size()
+            << " B | ASUN bin: " << bin10.size() << " B\n";
   std::cout << "   BIN is "
             << (1.0 - (double)bin10.size() / (double)s10.size()) * 100.0
             << "% smaller than text\n";
@@ -555,7 +555,7 @@ int main() {
                       Planet{"Mars", 3389.5, false, {}},
                   }},
           }}}};
-  auto s11 = ason::encode(universe);
+  auto s11 = asun::encode(universe);
   std::cout << "   serialized (" << s11.size() << " bytes)\n";
   assert(universe2.name == "Observable");
   assert(universe2.galaxies[0]
@@ -565,15 +565,15 @@ int main() {
              .nations[0]
              .states[0]
              .name == "Tokyo");
-  std::cout << "   ✓ 7-level ASON-text roundtrip OK\n";
+  std::cout << "   ✓ 7-level ASUN-text roundtrip OK\n";
 
-  // ASON binary roundtrip
-  auto bin11 = ason::encode_bin(universe);
-  auto universe_bin = ason::decode_bin<Universe>(bin11);
+  // ASUN binary roundtrip
+  auto bin11 = asun::encode_bin(universe);
+  auto universe_bin = asun::decode_bin<Universe>(bin11);
   assert(universe_bin.name == "Observable");
-  std::cout << "   ✓ 7-level ASON-bin roundtrip OK\n";
-  std::cout << "   ASON text: " << s11.size()
-            << " B | ASON bin: " << bin11.size() << " B\n";
+  std::cout << "   ✓ 7-level ASUN-bin roundtrip OK\n";
+  std::cout << "   ASUN text: " << s11.size()
+            << " B | ASUN bin: " << bin11.size() << " B\n";
   std::cout << "   BIN is "
             << (1.0 - (double)bin11.size() / (double)s11.size()) * 100.0
             << "% smaller than text\n";
@@ -591,27 +591,27 @@ int main() {
        {"DATABASE_URL", "postgres://localhost:5432/mydb"},
        {"SECRET_KEY", "abc123!@#"}},
   };
-  auto s12 = ason::encode(config);
+  auto s12 = asun::encode(config);
   std::cout << "   serialized (" << s12.size() << " bytes):\n   " << s12
             << "\n";
   assert(config2.log.file.has_value());
   assert(config2.features.size() == 3);
-  std::cout << "   ✓ config ASON-text roundtrip OK\n";
+  std::cout << "   ✓ config ASUN-text roundtrip OK\n";
 
-  // ASON binary roundtrip
-  auto bin12 = ason::encode_bin(config);
-  auto config_bin = ason::decode_bin<ServiceConfig>(bin12);
+  // ASUN binary roundtrip
+  auto bin12 = asun::encode_bin(config);
+  auto config_bin = asun::decode_bin<ServiceConfig>(bin12);
   assert(config_bin.name == "my-service");
-  std::cout << "   ✓ config ASON-bin roundtrip OK\n";
-  std::cout << "   ASON text: " << s12.size()
-            << " B | ASON bin: " << bin12.size() << " B\n";
+  std::cout << "   ✓ config ASUN-bin roundtrip OK\n";
+  std::cout << "   ASUN text: " << s12.size()
+            << " B | ASUN bin: " << bin12.size() << " B\n";
   std::cout << "   BIN is "
             << (1.0 - (double)bin12.size() / (double)s12.size()) * 100.0
             << "% smaller than text\n";
 
   // 13. Large structure — 100 countries
   std::cout << "\n13. Large structure (100 countries × nested regions):\n";
-  size_t total_ason_bytes = 0;
+  size_t total_asun_bytes = 0;
   for (int i = 0; i < 100; i++) {
     Country c;
     c.name = "Country_" + std::to_string(i);
@@ -647,15 +647,15 @@ int main() {
       }
       c.regions.push_back(reg);
     }
-    auto cs = ason::encode(c);
-    auto c2 = ason::decode<Country>(cs);
+    auto cs = asun::encode(c);
+    auto c2 = asun::decode<Country>(cs);
     assert(c2.name == c.name);
-    total_ason_bytes += cs.size();
+    total_asun_bytes += cs.size();
   }
-  std::cout << "   Total ASON: " << total_ason_bytes << " bytes ("
-            << (total_ason_bytes / 1024.0) << " KB)\n";
+  std::cout << "   Total ASUN: " << total_asun_bytes << " bytes ("
+            << (total_asun_bytes / 1024.0) << " KB)\n";
 
-  // Measure ASON-bin total
+  // Measure ASUN-bin total
   size_t total_bin_bytes = 0;
   for (int i = 0; i < 100; i++) {
     Country c; // Re-generate or use same logic
@@ -675,7 +675,7 @@ int main() {
 
   // 14. Deep schema type hints
   std::cout << "\n14. Deserialize with nested schema type hints:\n";
-  auto c14 = ason::decode<Country>(
+  auto c14 = asun::decode<Country>(
       "{name@str,code@str,population@int,gdp_trillion@float,"
       "regions@[{name@str,cities@[{name@str,population@int,area_km2@float,"
       "districts@[{name@str,population@int,streets@[{name@str,length_km@float,"
@@ -691,22 +691,22 @@ int main() {
   // 15. Typed serialization
   std::cout << "\n15. Typed serialization:\n";
   Employee emp15{1, "Alice", {"Engineering"}, {"Rust", "Go"}, true};
-  auto user_typed = ason::encode_typed(emp15);
+  auto user_typed = asun::encode_typed(emp15);
   std::cout << "   nested struct: " << user_typed << "\n";
-  auto emp_back = ason::decode<Employee>(user_typed);
+  auto emp_back = asun::decode<Employee>(user_typed);
   assert(emp_back.name == "Alice");
   std::cout << "   ✓ typed nested struct roundtrip OK\n";
 
-  auto all_typed = ason::encode_typed(all);
+  auto all_typed = asun::encode_typed(all);
   std::cout << "   all-types (" << all_typed.size() << " bytes)\n";
-  auto all_back = ason::decode<AllTypes>(all_typed);
+  auto all_back = asun::decode<AllTypes>(all_typed);
   assert(all_back.b == all.b);
   assert(all_back.i64v == all.i64v);
   std::cout << "   ✓ typed all-types roundtrip OK\n";
 
-  auto config_typed = ason::encode_typed(config);
+  auto config_typed = asun::encode_typed(config);
   std::cout << "   config (" << config_typed.size() << " bytes)\n";
-  auto config_back = ason::decode<ServiceConfig>(config_typed);
+  auto config_back = asun::decode<ServiceConfig>(config_typed);
   assert(config_back.name == config.name);
   std::cout << "   ✓ typed config roundtrip OK\n";
 
@@ -719,27 +719,27 @@ int main() {
   // 16. Edge cases
   std::cout << "\n16. Edge cases:\n";
   WithVec wv{{}};
-  auto sw = ason::encode(wv);
+  auto sw = asun::encode(wv);
   std::cout << "   empty vec: " << sw << "\n";
-  auto wv2 = ason::decode<WithVec>(sw);
+  auto wv2 = asun::decode<WithVec>(sw);
   assert(wv2.items.empty());
 
   Special sp{"tabs\there, newlines\nhere, quotes\"and\\backslash"};
-  auto ss = ason::encode(sp);
+  auto ss = asun::encode(sp);
   std::cout << "   special chars: " << ss << "\n";
-  auto sp2 = ason::decode<Special>(ss);
+  auto sp2 = asun::decode<Special>(ss);
   assert(sp.val == sp2.val);
 
   Special sp3{"true"};
-  auto ss3 = ason::encode(sp3);
+  auto ss3 = asun::encode(sp3);
   std::cout << "   bool-like string: " << ss3 << "\n";
-  auto sp4 = ason::decode<Special>(ss3);
+  auto sp4 = asun::decode<Special>(ss3);
   assert(sp3.val == sp4.val);
 
   Special sp5{"12345"};
-  auto ss5 = ason::encode(sp5);
+  auto ss5 = asun::encode(sp5);
   std::cout << "   number-like string: " << ss5 << "\n";
-  auto sp6 = ason::decode<Special>(ss5);
+  auto sp6 = asun::decode<Special>(ss5);
   assert(sp5.val == sp6.val);
   std::cout << "   ✓ all edge cases OK\n";
 
@@ -747,9 +747,9 @@ int main() {
   std::cout << "\n17. Triple-nested arrays:\n";
   Matrix3D m3;
   m3.data = {{{1, 2}, {3, 4}}, {{5, 6, 7}, {8}}};
-  auto sm3 = ason::encode(m3);
+  auto sm3 = asun::encode(m3);
   std::cout << "   " << sm3 << "\n";
-  auto m3b = ason::decode<Matrix3D>(sm3);
+  auto m3b = asun::decode<Matrix3D>(sm3);
   assert(m3b.data.size() == 2);
   assert(m3b.data[0][0] == std::vector<int64_t>({1, 2}));
   assert(m3b.data[1][0] == std::vector<int64_t>({5, 6, 7}));
@@ -757,7 +757,7 @@ int main() {
 
   // 18. Comments
   std::cout << "\n18. Comments:\n";
-  auto emp18 = ason::decode<Employee>("{id,name,dept@{title},skills,active}:/* "
+  auto emp18 = asun::decode<Employee>("{id,name,dept@{title},skills,active}:/* "
                                     "inline */ (1,Alice,(HR),[rust],true)");
   std::cout << "   with inline comment: Employee{id=" << emp18.id
             << ", name=" << emp18.name << "}\n";

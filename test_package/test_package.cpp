@@ -1,4 +1,4 @@
-#include <ason.hpp>
+#include <asun.hpp>
 
 #include <cstdint>
 #include <string>
@@ -10,7 +10,7 @@ struct User {
     bool active = false;
 };
 
-ASON_FIELDS(User,
+ASUN_FIELDS(User,
     (id, "id", "int"),
     (name, "name", "str"),
     (active, "active", "bool"))
@@ -21,7 +21,7 @@ int main() {
         {2, "Bob", false},
     };
 
-    auto encoded = ason::encode_typed(users);
-    auto decoded = ason::decode<std::vector<User>>(encoded);
+    auto encoded = asun::encode_typed(users);
+    auto decoded = asun::decode<std::vector<User>>(encoded);
     return decoded.size() == 2 ? 0 : 1;
 }

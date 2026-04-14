@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <iomanip>
-#include "ason.hpp"
+#include "asun.hpp"
 
 // For JSON comparison, we use a minimal inline JSON serializer/deserializer
 // to avoid external dependencies. This is NOT a full JSON library.
@@ -134,7 +134,7 @@ struct User {
     std::string city;
 };
 
-ASON_FIELDS(User,
+ASUN_FIELDS(User,
     (id,     "id",     "int"),
     (name,   "name",   "str"),
     (email,  "email",  "str"),
@@ -163,7 +163,7 @@ struct AllTypes {
     std::vector<std::string> vec_str;
 };
 
-ASON_FIELDS(AllTypes,
+ASUN_FIELDS(AllTypes,
     (b,        "b",        "bool"),
     (i8v,      "i8v",      "int"),
     (i16v,     "i16v",     "int"),
@@ -188,7 +188,7 @@ struct Task {
     bool done = false;
     double hours = 0;
 };
-ASON_FIELDS(Task,
+ASUN_FIELDS(Task,
     (id,       "id",       "int"),
     (title,    "title",    "str"),
     (priority, "priority", "int"),
@@ -201,7 +201,7 @@ struct Project {
     bool active = false;
     std::vector<Task> tasks;
 };
-ASON_FIELDS(Project,
+ASUN_FIELDS(Project,
     (name,   "name",   "str"),
     (budget, "budget", "float"),
     (active, "active", "bool"),
@@ -213,7 +213,7 @@ struct Team {
     int64_t size = 0;
     std::vector<Project> projects;
 };
-ASON_FIELDS(Team,
+ASUN_FIELDS(Team,
     (name,     "name",     "str"),
     (lead,     "lead",     "str"),
     (size,     "size",     "int"),
@@ -225,7 +225,7 @@ struct Division {
     int64_t headcount = 0;
     std::vector<Team> teams;
 };
-ASON_FIELDS(Division,
+ASUN_FIELDS(Division,
     (name,      "name",      "str"),
     (location,  "location",  "str"),
     (headcount, "headcount", "int"),
@@ -239,7 +239,7 @@ struct Company {
     std::vector<Division> divisions;
     std::vector<std::string> tags;
 };
-ASON_FIELDS(Company,
+ASUN_FIELDS(Company,
     (name,       "name",       "str"),
     (founded,    "founded",    "int"),
     (revenue_m,  "revenue_m",  "float"),
@@ -652,14 +652,14 @@ using Clock = std::chrono::high_resolution_clock;
 struct BenchResult {
     std::string name;
     double json_ser_ms = 0;
-    double ason_ser_ms = 0;
-    double ason_bin_ser_ms = 0;
+    double asun_ser_ms = 0;
+    double asun_bin_ser_ms = 0;
     double json_de_ms = 0;
-    double ason_de_ms = 0;
-    double ason_bin_de_ms = 0;
+    double asun_de_ms = 0;
+    double asun_bin_de_ms = 0;
     size_t json_bytes = 0;
-    size_t ason_bytes = 0;
-    size_t ason_bin_bytes = 0;
+    size_t asun_bytes = 0;
+    size_t asun_bin_bytes = 0;
 
     static std::string format_ratio(double ratio) {
         long tenths = static_cast<long>(ratio * 10.0 + 0.5);
@@ -675,26 +675,26 @@ struct BenchResult {
     }
 
     void print() const {
-        double ason_ser_ratio = json_ser_ms / ason_ser_ms;
-        double bin_ser_ratio = json_ser_ms / ason_bin_ser_ms;
-        double ason_de_ratio = json_de_ms / ason_de_ms;
-        double bin_de_ratio = json_de_ms / ason_bin_de_ms;
-        double ason_percent = ((double)ason_bytes / (double)json_bytes) * 100.0;
-        double bin_percent = ((double)ason_bin_bytes / (double)json_bytes) * 100.0;
+        double asun_ser_ratio = json_ser_ms / asun_ser_ms;
+        double bin_ser_ratio = json_ser_ms / asun_bin_ser_ms;
+        double asun_de_ratio = json_de_ms / asun_de_ms;
+        double bin_de_ratio = json_de_ms / asun_bin_de_ms;
+        double asun_percent = ((double)asun_bytes / (double)json_bytes) * 100.0;
+        double bin_percent = ((double)asun_bin_bytes / (double)json_bytes) * 100.0;
 
         std::cout << "  " << name << "\n";
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "    Serialize:   JSON " << std::setw(8) << json_ser_ms
-                  << "ms | ASON " << std::setw(8) << ason_ser_ms
-                  << "ms (" << format_ratio(ason_ser_ratio) << ") | BIN " << std::setw(8) << ason_bin_ser_ms
+                  << "ms | ASUN " << std::setw(8) << asun_ser_ms
+                  << "ms (" << format_ratio(asun_ser_ratio) << ") | BIN " << std::setw(8) << asun_bin_ser_ms
                   << "ms (" << format_ratio(bin_ser_ratio) << ")\n";
         std::cout << "    Deserialize: JSON " << std::setw(8) << json_de_ms
-                  << "ms | ASON " << std::setw(8) << ason_de_ms
-                  << "ms (" << format_ratio(ason_de_ratio) << ") | BIN " << std::setw(8) << ason_bin_de_ms
+                  << "ms | ASUN " << std::setw(8) << asun_de_ms
+                  << "ms (" << format_ratio(asun_de_ratio) << ") | BIN " << std::setw(8) << asun_bin_de_ms
                   << "ms (" << format_ratio(bin_de_ratio) << ")\n";
         std::cout << "    Size:        JSON " << std::setw(8) << json_bytes
-                  << " B | ASON " << std::setw(8) << ason_bytes
-                  << " B (" << format_percent(ason_percent) << ") | BIN " << std::setw(8) << ason_bin_bytes
+                  << " B | ASUN " << std::setw(8) << asun_bytes
+                  << " B (" << format_percent(asun_percent) << ") | BIN " << std::setw(8) << asun_bin_bytes
                   << " B (" << format_percent(bin_percent) << ")\n";
     }
 };
@@ -720,17 +720,17 @@ BenchResult bench_flat(size_t count, int iterations) {
     for (int i = 0; i < iterations; i++) json_str = json_serialize_users(users);
     double json_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON serialize
-    std::string ason_str;
+    // ASUN serialize
+    std::string asun_str;
     t0 = Clock::now();
-    for (int i = 0; i < iterations; i++) ason_str = ason::encode(users);
-    double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    for (int i = 0; i < iterations; i++) asun_str = asun::encode(users);
+    double asun_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN serialize
-    std::string ason_bin_str;
+    // ASUN-BIN serialize
+    std::string asun_bin_str;
     t0 = Clock::now();
-    for (int i = 0; i < iterations; i++) ason_bin_str = ason::encode_bin(users);
-    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    for (int i = 0; i < iterations; i++) asun_bin_str = asun::encode_bin(users);
+    double asun_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // JSON deserialize
     t0 = Clock::now();
@@ -740,31 +740,31 @@ BenchResult bench_flat(size_t count, int iterations) {
     }
     double json_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON deserialize
+    // ASUN deserialize
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto r = ason::decode<std::vector<User>>(ason_str);
+        auto r = asun::decode<std::vector<User>>(asun_str);
         assert(r.size() == count);
     }
-    double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN deserialize
+    // ASUN-BIN deserialize
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto r = ason::decode_bin<std::vector<User>>(ason_bin_str);
+        auto r = asun::decode_bin<std::vector<User>>(asun_bin_str);
         assert(r.size() == count);
     }
-    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // Verify
-    auto decoded = ason::decode<std::vector<User>>(ason_str);
+    auto decoded = asun::decode<std::vector<User>>(asun_str);
     assert(decoded.size() == count);
     assert(decoded[0].id == users[0].id);
 
     return BenchResult{
         "Flat struct × " + std::to_string(count) + " (8 fields)",
-        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
-        json_str.size(), ason_str.size(), ason_bin_str.size()
+        json_ser, asun_ser, asun_bin_ser, json_de, asun_de, asun_bin_de,
+        json_str.size(), asun_str.size(), asun_bin_str.size()
     };
 }
 
@@ -779,21 +779,21 @@ BenchResult bench_all_types(size_t count, int iterations) {
     }
     double json_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON serialize as one schema-driven vector payload
-    std::string ason_str;
+    // ASUN serialize as one schema-driven vector payload
+    std::string asun_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_str = ason::encode(items);
+        asun_str = asun::encode(items);
     }
-    double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN serialize as one vector payload
-    std::string ason_bin_str;
+    // ASUN-BIN serialize as one vector payload
+    std::string asun_bin_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_bin_str = ason::encode_bin(items);
+        asun_bin_str = asun::encode_bin(items);
     }
-    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // JSON deserialize
     t0 = Clock::now();
@@ -803,30 +803,30 @@ BenchResult bench_all_types(size_t count, int iterations) {
     }
     double json_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON deserialize
+    // ASUN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        auto r = ason::decode<std::vector<AllTypes>>(ason_str);
+        auto r = asun::decode<std::vector<AllTypes>>(asun_str);
         assert(r.size() == count);
     }
-    double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN deserialize
+    // ASUN-BIN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        auto r = ason::decode_bin<std::vector<AllTypes>>(ason_bin_str);
+        auto r = asun::decode_bin<std::vector<AllTypes>>(asun_bin_str);
         assert(r.size() == count);
     }
-    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    auto decoded = ason::decode<std::vector<AllTypes>>(ason_str);
+    auto decoded = asun::decode<std::vector<AllTypes>>(asun_str);
     assert(decoded.size() == count);
     assert(decoded[0].vec_int.size() == items[0].vec_int.size());
 
     return BenchResult{
         "All-types struct × " + std::to_string(count) + " (16 fields, vec)",
-        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
-        json_str.size(), ason_str.size(), ason_bin_str.size()
+        json_ser, asun_ser, asun_bin_ser, json_de, asun_de, asun_bin_de,
+        json_str.size(), asun_str.size(), asun_bin_str.size()
     };
 }
 
@@ -899,21 +899,21 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double json_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON serialize as one schema-driven vector payload
-    std::string ason_str;
+    // ASUN serialize as one schema-driven vector payload
+    std::string asun_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_str = ason::encode(companies);
+        asun_str = asun::encode(companies);
     }
-    double ason_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN serialize as one vector payload
-    std::string ason_bin_str;
+    // ASUN-BIN serialize as one vector payload
+    std::string asun_bin_str;
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        ason_bin_str = ason::encode_bin(companies);
+        asun_bin_str = asun::encode_bin(companies);
     }
-    double ason_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_bin_ser = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // JSON deserialize
     t0 = Clock::now();
@@ -923,24 +923,24 @@ BenchResult bench_deep(size_t count, int iterations) {
     }
     double json_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON deserialize
+    // ASUN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        auto r = ason::decode<std::vector<Company>>(ason_str);
+        auto r = asun::decode<std::vector<Company>>(asun_str);
         assert(r.size() == count);
     }
-    double ason_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    // ASON-BIN deserialize
+    // ASUN-BIN deserialize
     t0 = Clock::now();
     for (int iter = 0; iter < iterations; iter++) {
-        auto r = ason::decode_bin<std::vector<Company>>(ason_bin_str);
+        auto r = asun::decode_bin<std::vector<Company>>(asun_bin_str);
         assert(r.size() == count);
     }
-    double ason_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_bin_de = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     // Verify
-    auto roundtrip = ason::decode<std::vector<Company>>(ason_str);
+    auto roundtrip = asun::decode<std::vector<Company>>(asun_str);
     assert(roundtrip.size() == companies.size());
     for (size_t i = 0; i < roundtrip.size(); i++) {
         auto& c2 = roundtrip[i];
@@ -949,8 +949,8 @@ BenchResult bench_deep(size_t count, int iterations) {
 
     return BenchResult{
         "5-level deep × " + std::to_string(count) + " (Company>Division>Team>Project>Task)",
-        json_ser, ason_ser, ason_bin_ser, json_de, ason_de, ason_bin_de,
-        json_str.size(), ason_str.size(), ason_bin_str.size()
+        json_ser, asun_ser, asun_bin_ser, json_de, asun_de, asun_bin_de,
+        json_str.size(), asun_str.size(), asun_bin_str.size()
     };
 }
 
@@ -959,11 +959,11 @@ std::pair<double, double> bench_single_roundtrip(int iterations) {
 
     auto t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto s = ason::encode(user);
-        auto r = ason::decode<User>(s);
+        auto s = asun::encode(user);
+        auto r = asun::decode<User>(s);
         (void)r;
     }
-    double ason_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
@@ -975,7 +975,7 @@ std::pair<double, double> bench_single_roundtrip(int iterations) {
     }
     double json_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    return {ason_ms, json_ms};
+    return {asun_ms, json_ms};
 }
 
 std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
@@ -1037,11 +1037,11 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
 
     auto t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
-        auto s = ason::encode(company);
-        auto r = ason::decode<Company>(s);
+        auto s = asun::encode(company);
+        auto r = asun::decode<Company>(s);
         (void)r;
     }
-    double ason_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    double asun_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
     t0 = Clock::now();
     for (int i = 0; i < iterations; i++) {
@@ -1054,7 +1054,7 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
     }
     double json_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
-    return {ason_ms, json_ms};
+    return {asun_ms, json_ms};
 }
 
 // ===========================================================================
@@ -1063,7 +1063,7 @@ std::pair<double, double> bench_deep_single_roundtrip(int iterations) {
 
 int main() {
     std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║         ASON vs JSON Comprehensive Benchmark (C++)           ║\n";
+    std::cout << "║         ASUN vs JSON Comprehensive Benchmark (C++)           ║\n";
     std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
 
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -1115,16 +1115,16 @@ int main() {
     std::cout << "│  Section 4: Single Struct Roundtrip (10000x) │\n";
     std::cout << "└──────────────────────────────────────────────┘\n";
 
-    auto [ason_flat, json_flat] = bench_single_roundtrip(10000);
+    auto [asun_flat, json_flat] = bench_single_roundtrip(10000);
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "  Flat:  ASON " << std::setw(6) << ason_flat
+    std::cout << "  Flat:  ASUN " << std::setw(6) << asun_flat
               << "ms | JSON " << std::setw(6) << json_flat
-              << "ms | ratio " << (json_flat / ason_flat) << "x\n";
+              << "ms | ratio " << (json_flat / asun_flat) << "x\n";
 
-    auto [ason_deep, json_deep] = bench_deep_single_roundtrip(10000);
-    std::cout << "  Deep:  ASON " << std::setw(6) << ason_deep
+    auto [asun_deep, json_deep] = bench_deep_single_roundtrip(10000);
+    std::cout << "  Deep:  ASUN " << std::setw(6) << asun_deep
               << "ms | JSON " << std::setw(6) << json_deep
-              << "ms | ratio " << (json_deep / ason_deep) << "x\n";
+              << "ms | ratio " << (json_deep / asun_deep) << "x\n";
 
     // Section 5: Large payload
     std::cout << "\n┌──────────────────────────────────────────────┐\n";
@@ -1141,24 +1141,24 @@ int main() {
     std::cout << "└──────────────────────────────────────────────────────────────┘\n";
     {
         auto users_1k = generate_users(1000);
-        auto ason_untyped = ason::encode(users_1k);
-        auto ason_typed = ason::encode_typed(users_1k);
+        auto asun_untyped = asun::encode(users_1k);
+        auto asun_typed = asun::encode_typed(users_1k);
 
-        auto v1 = ason::decode<std::vector<User>>(ason_untyped);
-        auto v2 = ason::decode<std::vector<User>>(ason_typed);
+        auto v1 = asun::decode<std::vector<User>>(asun_untyped);
+        auto v2 = asun::decode<std::vector<User>>(asun_typed);
         assert(v1.size() == v2.size());
 
         int de_iters = 200;
         auto t0 = Clock::now();
         for (int i = 0; i < de_iters; i++) {
-            auto r = ason::decode<std::vector<User>>(ason_untyped);
+            auto r = asun::decode<std::vector<User>>(asun_untyped);
             (void)r;
         }
         double untyped_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         t0 = Clock::now();
         for (int i = 0; i < de_iters; i++) {
-            auto r = ason::decode<std::vector<User>>(ason_typed);
+            auto r = asun::decode<std::vector<User>>(asun_typed);
             (void)r;
         }
         double typed_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
@@ -1166,9 +1166,9 @@ int main() {
         std::cout << std::fixed << std::setprecision(2);
         std::cout << "  Flat struct × 1000 (" << de_iters << " iters, deserialize only)\n";
         std::cout << "    Unannotated: " << std::setw(8) << untyped_ms << "ms  ("
-                  << ason_untyped.size() << " B)\n";
+                  << asun_untyped.size() << " B)\n";
         std::cout << "    Annotated:   " << std::setw(8) << typed_ms << "ms  ("
-                  << ason_typed.size() << " B)\n";
+                  << asun_typed.size() << " B)\n";
         std::cout << "    Ratio: " << std::setprecision(3) << (untyped_ms / typed_ms)
                   << "x (unannotated / annotated)\n";
     }
@@ -1183,12 +1183,12 @@ int main() {
 
         auto t0 = Clock::now();
         std::string untyped_out;
-        for (int i = 0; i < ser_iters; i++) untyped_out = ason::encode(users_1k);
+        for (int i = 0; i < ser_iters; i++) untyped_out = asun::encode(users_1k);
         double untyped_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         t0 = Clock::now();
         std::string typed_out;
-        for (int i = 0; i < ser_iters; i++) typed_out = ason::encode_typed(users_1k);
+        for (int i = 0; i < ser_iters; i++) typed_out = asun::encode_typed(users_1k);
         double typed_ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 
         std::cout << std::fixed << std::setprecision(2);
@@ -1208,7 +1208,7 @@ int main() {
     {
         auto users_1k = generate_users(1000);
         auto json_1k = json_serialize_users(users_1k);
-        auto ason_1k = ason::encode(users_1k);
+        auto asun_1k = asun::encode(users_1k);
 
         int iters = 100;
         auto t0 = Clock::now();
@@ -1216,27 +1216,27 @@ int main() {
         double json_ser_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
-        for (int i = 0; i < iters; i++) { auto s = ason::encode(users_1k); (void)s; }
-        double ason_ser_dur = std::chrono::duration<double>(Clock::now() - t0).count();
+        for (int i = 0; i < iters; i++) { auto s = asun::encode(users_1k); (void)s; }
+        double asun_ser_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
         for (int i = 0; i < iters; i++) { auto r = json_deserialize_users(json_1k); (void)r; }
         double json_de_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         t0 = Clock::now();
-        for (int i = 0; i < iters; i++) { auto r = ason::decode<std::vector<User>>(ason_1k); (void)r; }
-        double ason_de_dur = std::chrono::duration<double>(Clock::now() - t0).count();
+        for (int i = 0; i < iters; i++) { auto r = asun::decode<std::vector<User>>(asun_1k); (void)r; }
+        double asun_de_dur = std::chrono::duration<double>(Clock::now() - t0).count();
 
         double total_records = 1000.0 * iters;
         double json_ser_rps = total_records / json_ser_dur;
-        double ason_ser_rps = total_records / ason_ser_dur;
+        double asun_ser_rps = total_records / asun_ser_dur;
         double json_de_rps = total_records / json_de_dur;
-        double ason_de_rps = total_records / ason_de_dur;
+        double asun_de_rps = total_records / asun_de_dur;
 
         double json_ser_mbps = (double)(json_1k.size() * iters) / json_ser_dur / 1048576.0;
-        double ason_ser_mbps = (double)(ason_1k.size() * iters) / ason_ser_dur / 1048576.0;
+        double asun_ser_mbps = (double)(asun_1k.size() * iters) / asun_ser_dur / 1048576.0;
         double json_de_mbps = (double)(json_1k.size() * iters) / json_de_dur / 1048576.0;
-        double ason_de_mbps = (double)(ason_1k.size() * iters) / ason_de_dur / 1048576.0;
+        double asun_de_mbps = (double)(asun_1k.size() * iters) / asun_de_dur / 1048576.0;
 
         std::cout << std::fixed;
         std::cout << "  Serialize throughput (1000 records × " << iters << " iters):\n";
@@ -1244,22 +1244,22 @@ int main() {
         std::cout << "    JSON: " << json_ser_rps << " records/s  ("
                   << std::setprecision(1) << json_ser_mbps << " MB/s)\n";
         std::cout << std::setprecision(0);
-        std::cout << "    ASON: " << ason_ser_rps << " records/s  ("
-                  << std::setprecision(1) << ason_ser_mbps << " MB/s)\n";
+        std::cout << "    ASUN: " << asun_ser_rps << " records/s  ("
+                  << std::setprecision(1) << asun_ser_mbps << " MB/s)\n";
         std::cout << std::setprecision(2);
-        std::cout << "    Speed: " << (ason_ser_rps / json_ser_rps) << "x"
-                  << (ason_ser_rps > json_ser_rps ? " ✓ ASON faster" : "") << "\n";
+        std::cout << "    Speed: " << (asun_ser_rps / json_ser_rps) << "x"
+                  << (asun_ser_rps > json_ser_rps ? " ✓ ASUN faster" : "") << "\n";
 
         std::cout << "  Deserialize throughput:\n";
         std::cout << std::setprecision(0);
         std::cout << "    JSON: " << json_de_rps << " records/s  ("
                   << std::setprecision(1) << json_de_mbps << " MB/s)\n";
         std::cout << std::setprecision(0);
-        std::cout << "    ASON: " << ason_de_rps << " records/s  ("
-                  << std::setprecision(1) << ason_de_mbps << " MB/s)\n";
+        std::cout << "    ASUN: " << asun_de_rps << " records/s  ("
+                  << std::setprecision(1) << asun_de_mbps << " MB/s)\n";
         std::cout << std::setprecision(2);
-        std::cout << "    Speed: " << (ason_de_rps / json_de_rps) << "x"
-                  << (ason_de_rps > json_de_rps ? " ✓ ASON faster" : "") << "\n";
+        std::cout << "    Speed: " << (asun_de_rps / json_de_rps) << "x"
+                  << (asun_de_rps > json_de_rps ? " ✓ ASUN faster" : "") << "\n";
     }
 
     std::cout << "\n╔══════════════════════════════════════════════════════════════╗\n";

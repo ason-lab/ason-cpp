@@ -1,4 +1,4 @@
-#include "ason.hpp"
+#include "asun.hpp"
 #include <cassert>
 #include <iostream>
 
@@ -8,7 +8,7 @@ struct User {
   bool active = false;
 };
 
-ASON_FIELDS(User, (id, "id", "int"), (name, "name", "str"),
+ASUN_FIELDS(User, (id, "id", "int"), (name, "name", "str"),
             (active, "active", "bool"))
 
 struct Item {
@@ -16,32 +16,32 @@ struct Item {
   std::optional<std::string> label;
 };
 
-ASON_FIELDS(Item, (id, "id", "int"), (label, "label", "str"))
+ASUN_FIELDS(Item, (id, "id", "int"), (label, "label", "str"))
 
 struct Tagged {
   std::string name;
   std::vector<std::string> tags;
 };
 
-ASON_FIELDS(Tagged, (name, "name", "str"), (tags, "tags", "[str]"))
+ASUN_FIELDS(Tagged, (name, "name", "str"), (tags, "tags", "[str]"))
 
 int main() {
-  std::cout << "=== ASON Basic Examples (C++) ===\n\n";
+  std::cout << "=== ASUN Basic Examples (C++) ===\n\n";
 
   // 1. Serialize a single struct
   User user{1, "Alice", true};
-  auto ason_str = ason::encode(user);
-  std::cout << "1. Serialize single struct:\n   " << ason_str << "\n\n";
+  auto asun_str = asun::encode(user);
+  std::cout << "1. Serialize single struct:\n   " << asun_str << "\n\n";
 
   // 2. Serialize with type annotations
-  auto typed_str = ason::encode_typed(user);
+  auto typed_str = asun::encode_typed(user);
   std::cout << "2. Serialize with type annotations:\n   " << typed_str
             << "\n\n";
   assert(typed_str.find("{id@int,name@str,active@bool}:") == 0);
 
-  // 3. Deserialize from ASON
+  // 3. Deserialize from ASUN
   auto loaded =
-      ason::decode<User>("{id@int,name@str,active@bool}:(1,Alice,true)");
+      asun::decode<User>("{id@int,name@str,active@bool}:(1,Alice,true)");
   std::cout << "3. Deserialize single struct:\n   "
             << "User{id=" << loaded.id << ", name=\"" << loaded.name
             << "\", active=" << (loaded.active ? "true" : "false") << "}\n\n";
@@ -55,11 +55,11 @@ int main() {
       {2, "Bob", false},
       {3, "Carol Smith", true},
   };
-  auto ason_vec = ason::encode(users);
-  std::cout << "4. Serialize vec (schema-driven):\n   " << ason_vec << "\n\n";
+  auto asun_vec = asun::encode(users);
+  std::cout << "4. Serialize vec (schema-driven):\n   " << asun_vec << "\n\n";
 
   // 5. Serialize vec with type annotations
-  auto typed_vec = ason::encode_typed(users);
+  auto typed_vec = asun::encode_typed(users);
   std::cout << "5. Serialize vec with type annotations:\n   " << typed_vec
             << "\n\n";
   assert(typed_vec.find("[{id@int,name@str,active@bool}]:") == 0);
@@ -67,7 +67,7 @@ int main() {
   // 6. Deserialize vec
   auto input6 = std::string_view("[{id@int,name@str,active@bool}]:(1,Alice,true),"
                                  "(2,Bob,false),(3,\"Carol Smith\",true)");
-  auto users2 = ason::decode<std::vector<User>>(input6);
+  auto users2 = asun::decode<std::vector<User>>(input6);
   std::cout << "6. Deserialize vec:\n";
   for (auto &u : users2) {
     std::cout << "   User{id=" << u.id << ", name=\"" << u.name
@@ -82,29 +82,29 @@ int main() {
                                     "  (1, Alice, true),\n"
                                     "  (2, Bob, false),\n"
                                     "  (3, \"Carol Smith\", true)");
-  auto users3 = ason::decode<std::vector<User>>(multiline);
+  auto users3 = asun::decode<std::vector<User>>(multiline);
   for (auto &u : users3) {
     std::cout << "   User{id=" << u.id << ", name=\"" << u.name
               << "\", active=" << (u.active ? "true" : "false") << "}\n";
   }
   assert(users3.size() == 3);
 
-  // 8. Roundtrip (ASON-text + ASON-bin)
-  std::cout << "\n8. Roundtrip (ASON-text vs ASON-bin):\n";
+  // 8. Roundtrip (ASUN-text + ASUN-bin)
+  std::cout << "\n8. Roundtrip (ASUN-text vs ASUN-bin):\n";
   User original{42, "Test User", true};
 
-  // ASON text roundtrip
-  auto serialized = ason::encode(original);
-  auto deserialized = ason::decode<User>(serialized);
-  std::cout << "   ASON text:    " << serialized << " (" << serialized.size()
+  // ASUN text roundtrip
+  auto serialized = asun::encode(original);
+  auto deserialized = asun::decode<User>(serialized);
+  std::cout << "   ASUN text:    " << serialized << " (" << serialized.size()
             << " B)\n";
   assert(deserialized.id == original.id);
   assert(deserialized.name == original.name);
 
-  // ASON binary roundtrip
-  auto binary = ason::encode_bin(original);
-  auto deserialized_bin = ason::decode_bin<User>(binary);
-  std::cout << "   ASON binary:  " << binary.size() << " B\n";
+  // ASUN binary roundtrip
+  auto binary = asun::encode_bin(original);
+  auto deserialized_bin = asun::decode_bin<User>(binary);
+  std::cout << "   ASUN binary:  " << binary.size() << " B\n";
   assert(deserialized_bin.id == original.id);
   assert(deserialized_bin.name == original.name);
 
@@ -115,20 +115,20 @@ int main() {
 
   // 9. Optional fields
   std::cout << "\n9. Optional fields:\n";
-  auto item1 = ason::decode<Item>("{id,label}:(1,hello)");
+  auto item1 = asun::decode<Item>("{id,label}:(1,hello)");
   std::cout << "   with value: Item{id=" << item1.id << ", label="
             << (item1.label ? "\"" + *item1.label + "\"" : "nullopt") << "}\n";
   assert(item1.label.has_value());
   assert(*item1.label == "hello");
 
-  auto item2 = ason::decode<Item>("{id,label}:(2,)");
+  auto item2 = asun::decode<Item>("{id,label}:(2,)");
   std::cout << "   with null:  Item{id=" << item2.id << ", label="
             << (item2.label ? "\"" + *item2.label + "\"" : "nullopt") << "}\n";
   assert(!item2.label.has_value());
 
   // 10. Array fields
   std::cout << "\n10. Array fields:\n";
-  auto t = ason::decode<Tagged>("{name,tags}:(Alice,[rust,go,python])");
+  auto t = asun::decode<Tagged>("{name,tags}:(Alice,[rust,go,python])");
   std::cout << "   Tagged{name=\"" << t.name << "\", tags=[";
   for (size_t i = 0; i < t.tags.size(); i++) {
     if (i > 0)
@@ -141,7 +141,7 @@ int main() {
   // 11. Comments
   std::cout << "\n11. With comments:\n";
   auto user4 =
-      ason::decode<User>("/* user list */ {id,name,active}:(1,Alice,true)");
+      asun::decode<User>("/* user list */ {id,name,active}:(1,Alice,true)");
   std::cout << "   User{id=" << user4.id << ", name=\"" << user4.name
             << "\"}\n";
   assert(user4.id == 1);

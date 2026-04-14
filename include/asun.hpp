@@ -1,25 +1,25 @@
 #pragma once
 // ============================================================================
-// ASON — Array-Schema Object Notation  (C++17 header-only, SIMD-accelerated)
+// ASUN — Array-Schema Unified Notation  (C++17 header-only, SIMD-accelerated)
 //
 // API:
-//   ason::encode(object)           -> std::string       (serialize single struct)
-//   ason::encode(vector)           -> std::string       (serialize vector)
-//   ason::encode_typed(object)     -> std::string       (serialize with @ annotations)
-//   ason::encode_typed(vector)     -> std::string       (serialize vector typed)
-//   ason::decode<T>(str)           -> T                 (deserialize, auto-detects single/{vec})
-//   ason::encode_bin(object)       -> std::string       (binary serialize)
-//   ason::decode_bin<T>(str)       -> T                 (binary deserialize)
+//   asun::encode(object)           -> std::string       (serialize single struct)
+//   asun::encode(vector)           -> std::string       (serialize vector)
+//   asun::encode_typed(object)     -> std::string       (serialize with @ annotations)
+//   asun::encode_typed(vector)     -> std::string       (serialize vector typed)
+//   asun::decode<T>(str)           -> T                 (deserialize, auto-detects single/{vec})
+//   asun::encode_bin(object)       -> std::string       (binary serialize)
+//   asun::decode_bin<T>(str)       -> T                 (binary deserialize)
 //
 // Reflection macro:
-//   ASON_FIELDS(StructName, (field1, "name1", "type1"), (field2, "name2", "type2"), ...)
+//   ASUN_FIELDS(StructName, (field1, "name1", "type1"), (field2, "name2", "type2"), ...)
 //
 // All parsing is zero-copy (string_view) where possible.
 // Uses SIMD (NEON / SSE2) for string scanning and escaping.
 // ============================================================================
 
-#ifndef ASON_HPP
-#define ASON_HPP
+#ifndef ASUN_HPP
+#define ASUN_HPP
 
 #include <cstdint>
 #include <cstring>
@@ -40,13 +40,13 @@
 // SIMD headers
 #if defined(__aarch64__) || defined(_M_ARM64)
   #include <arm_neon.h>
-  #define ASON_NEON 1
+  #define ASUN_NEON 1
 #elif defined(__x86_64__) || defined(_M_X64)
   #include <immintrin.h>
-  #define ASON_SSE2 1
+  #define ASUN_SSE2 1
 #endif
 
-namespace ason {
+namespace asun {
 
 // ============================================================================
 // Error
@@ -65,7 +65,7 @@ namespace simd {
 
 static constexpr int LANES = 16;
 
-#if defined(ASON_NEON)
+#if defined(ASUN_NEON)
 
 inline uint16_t movemask(uint8x16_t v) {
     uint16x8_t high_bits = vreinterpretq_u16_u8(vshrq_n_u8(v, 7));
@@ -141,7 +141,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     return false;
 }
 
-#elif defined(ASON_SSE2)
+#elif defined(ASUN_SSE2)
 
 inline size_t find_quote_or_special(const uint8_t* ptr, size_t len) {
     size_t i = 0;
@@ -438,12 +438,12 @@ static constexpr uint8_t ESCAPE_CHAR[256] = {
 } // namespace detail
 
 // ============================================================================
-// Type traits for ASON field reflection
+// Type traits for ASUN field reflection
 // ============================================================================
 
-// Primary trait: specialised via ASON_FIELDS macro
+// Primary trait: specialised via ASUN_FIELDS macro
 template <typename T>
-struct AsonFields {
+struct AsunFields {
     static constexpr bool defined = false;
 };
 
@@ -475,19 +475,19 @@ template <> struct TypeName<char>           { static constexpr const char* value
 // ============================================================================
 
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 dump_value(std::string& buf, const T& v);
 
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 load_value(const char*& pos, const char* end, T& out);
 
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 dump_bin_value(std::string& buf, const T& v);
 
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 load_bin_value(const char*& pos, const char* end, T& out);
 
 // ============================================================================
@@ -537,12 +537,12 @@ void dump_value(std::string& buf, const std::optional<T>& v) {
     // else: empty (null)
 }
 
-// Struct dump — requires AsonFields specialization
+// Struct dump — requires AsunFields specialization
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 dump_value(std::string& buf, const T& v) {
     buf.push_back('(');
-    AsonFields<T>::dump_fields(buf, v);
+    AsunFields<T>::dump_fields(buf, v);
     buf.push_back(')');
 }
 
@@ -985,9 +985,9 @@ void load_value(const char*& pos, const char* end, std::optional<T>& out) {
     out = std::move(val);
 }
 
-// Struct load — requires AsonFields specialization
+// Struct load — requires AsunFields specialization
 template <typename T>
-std::enable_if_t<AsonFields<T>::defined, void>
+std::enable_if_t<AsunFields<T>::defined, void>
 load_value(const char*& pos, const char* end, T& out) {
     detail::skip_whitespace_and_comments(pos, end);
 
@@ -1001,7 +1001,7 @@ load_value(const char*& pos, const char* end, T& out) {
         // Build a stack-local index table: schema index -> struct field index
         int field_map[detail::ParsedSchema::MAX_FIELDS];
         for (int fi = 0; fi < schema.count; fi++)
-            field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
+            field_map[fi] = AsunFields<T>::find_field(schema.fields[fi]);
         // Parse tuple
         if (pos >= end || *pos != '(') throw Error("expected '('");
         pos++;
@@ -1014,7 +1014,7 @@ load_value(const char*& pos, const char* end, T& out) {
                 else throw Error("expected ',' or ')'");
             }
             if (field_map[i] >= 0) {
-                AsonFields<T>::load_field(pos, end, out, field_map[i]);
+                AsunFields<T>::load_field(pos, end, out, field_map[i]);
             } else {
                 detail::skip_value(pos, end);
             }
@@ -1028,7 +1028,7 @@ load_value(const char*& pos, const char* end, T& out) {
     // Positional tuple: (val1,val2,...)
     if (pos < end && *pos == '(') {
         pos++;
-        constexpr int N = AsonFields<T>::field_count;
+        constexpr int N = AsunFields<T>::field_count;
         for (int i = 0; i < N; i++) {
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') break;
@@ -1037,7 +1037,7 @@ load_value(const char*& pos, const char* end, T& out) {
                 else if (*pos == ')') break;
                 else throw Error("expected ',' or ')'");
             }
-            AsonFields<T>::load_field(pos, end, out, i);
+            AsunFields<T>::load_field(pos, end, out, i);
         }
         detail::skip_remaining_tuple_values(pos, end);
         detail::skip_whitespace_and_comments(pos, end);
@@ -1154,15 +1154,15 @@ inline void load_bin_value(const char*& pos, const char* end, std::optional<T>& 
 }
 
 template <typename T>
-inline std::enable_if_t<AsonFields<T>::defined, void>
+inline std::enable_if_t<AsunFields<T>::defined, void>
 dump_bin_value(std::string& buf, const T& v) {
-    AsonFields<T>::dump_bin_fields(buf, v);
+    AsunFields<T>::dump_bin_fields(buf, v);
 }
 
 template <typename T>
-inline std::enable_if_t<AsonFields<T>::defined, void>
+inline std::enable_if_t<AsunFields<T>::defined, void>
 load_bin_value(const char*& pos, const char* end, T& out) {
-    AsonFields<T>::load_bin_fields(pos, end, out);
+    AsunFields<T>::load_bin_fields(pos, end, out);
 }
 
 // ============================================================================
@@ -1182,18 +1182,18 @@ template <typename T> struct is_optional<std::optional<T>> : std::true_type {};
 template <typename FieldType>
 inline void write_field_schema(std::string& buf, bool typed) {
     using T = std::decay_t<FieldType>;
-    if constexpr (AsonFields<T>::defined) {
+    if constexpr (AsunFields<T>::defined) {
         // Nested struct: field@{f1,f2,...}
         buf.push_back('@');
         buf.push_back('{');
-        AsonFields<T>::write_schema(buf, typed);
+        AsunFields<T>::write_schema(buf, typed);
         buf.push_back('}');
     } else if constexpr (is_vector<T>::value) {
         using Elem = typename T::value_type;
-        if constexpr (AsonFields<Elem>::defined) {
+        if constexpr (AsunFields<Elem>::defined) {
             // Vector of structs: field@[{f1,f2,...}]
             buf.append("@[{", 3);
-            AsonFields<Elem>::write_schema(buf, typed);
+            AsunFields<Elem>::write_schema(buf, typed);
             buf.append("}]", 2);
         } else if (typed) {
             auto tn = TypeName<Elem>::value;
@@ -1201,10 +1201,10 @@ inline void write_field_schema(std::string& buf, bool typed) {
         }
     } else if constexpr (is_optional<T>::value) {
         using Inner = typename T::value_type;
-        if constexpr (AsonFields<Inner>::defined) {
+        if constexpr (AsunFields<Inner>::defined) {
             buf.push_back('@');
             buf.push_back('{');
-            AsonFields<Inner>::write_schema(buf, typed);
+            AsunFields<Inner>::write_schema(buf, typed);
             buf.push_back('}');
         } else if (typed) {
             auto tn = TypeName<Inner>::value;
@@ -1217,81 +1217,81 @@ inline void write_field_schema(std::string& buf, bool typed) {
 }
 } // namespace detail
 
-// encode: struct -> ASON string  {field1,field2,...}:(val1,val2,...)
-// encode: vector<struct> -> ASON string  [{field1,field2,...}]:(val1,...),(val2,...),...
+// encode: struct -> ASUN string  {field1,field2,...}:(val1,val2,...)
+// encode: vector<struct> -> ASUN string  [{field1,field2,...}]:(val1,...),(val2,...),...
 template <typename T>
 std::string encode(const T& v) {
     if constexpr (detail::is_vector<T>::value) {
         using Elem = typename T::value_type;
-        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        static_assert(AsunFields<Elem>::defined, "ASUN_FIELDS not defined for element type");
         std::string buf;
         buf.reserve(v.size() * 64 + 128);
         buf.push_back('[');
         buf.push_back('{');
-        AsonFields<Elem>::write_schema(buf, false);
+        AsunFields<Elem>::write_schema(buf, false);
         buf.push_back('}');
         buf.push_back(']');
         buf.push_back(':');
         for (size_t i = 0; i < v.size(); i++) {
             if (i > 0) buf.push_back(',');
             buf.push_back('(');
-            AsonFields<Elem>::dump_fields(buf, v[i]);
+            AsunFields<Elem>::dump_fields(buf, v[i]);
             buf.push_back(')');
         }
         return buf;
     } else {
-        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        static_assert(AsunFields<T>::defined, "ASUN_FIELDS not defined for this type");
         std::string buf;
         buf.reserve(256);
         buf.push_back('{');
-        AsonFields<T>::write_schema(buf, false);
+        AsunFields<T>::write_schema(buf, false);
         buf.push_back('}');
         buf.push_back(':');
         buf.push_back('(');
-        AsonFields<T>::dump_fields(buf, v);
+        AsunFields<T>::dump_fields(buf, v);
         buf.push_back(')');
         return buf;
     }
 }
 
-// encode_typed: struct or vector<struct> -> ASON string with type annotations
+// encode_typed: struct or vector<struct> -> ASUN string with type annotations
 template <typename T>
 std::string encode_typed(const T& v) {
     if constexpr (detail::is_vector<T>::value) {
         using Elem = typename T::value_type;
-        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        static_assert(AsunFields<Elem>::defined, "ASUN_FIELDS not defined for element type");
         std::string buf;
         buf.reserve(v.size() * 64 + 128);
         buf.push_back('[');
         buf.push_back('{');
-        AsonFields<Elem>::write_schema(buf, true);
+        AsunFields<Elem>::write_schema(buf, true);
         buf.push_back('}');
         buf.push_back(']');
         buf.push_back(':');
         for (size_t i = 0; i < v.size(); i++) {
             if (i > 0) buf.push_back(',');
             buf.push_back('(');
-            AsonFields<Elem>::dump_fields(buf, v[i]);
+            AsunFields<Elem>::dump_fields(buf, v[i]);
             buf.push_back(')');
         }
         return buf;
     } else {
-        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        static_assert(AsunFields<T>::defined, "ASUN_FIELDS not defined for this type");
         std::string buf;
         buf.reserve(256);
         buf.push_back('{');
-        AsonFields<T>::write_schema(buf, true);
+        AsunFields<T>::write_schema(buf, true);
         buf.push_back('}');
         buf.push_back(':');
         buf.push_back('(');
-        AsonFields<T>::dump_fields(buf, v);
+        AsunFields<T>::dump_fields(buf, v);
         buf.push_back(')');
         return buf;
     }
 }
 
 // ---------------------------------------------------------------------------
-// Pretty-format: smart indentation for ASON output
+// Pretty-format: smart indentation for ASUN output
 // ---------------------------------------------------------------------------
 //   Simple structures stay inline:   {name@str, age@int}:(Alice, 30)
 //   Complex structures expand with 2-space indentation.
@@ -1470,7 +1470,7 @@ struct PrettyFmt {
 
 } // namespace detail
 
-// pretty_format: reformat compact ASON with smart indentation
+// pretty_format: reformat compact ASUN with smart indentation
 inline std::string pretty_format(const std::string& compact) {
     if (compact.empty()) return compact;
     auto mat = detail::build_match_table(compact);
@@ -1480,26 +1480,26 @@ inline std::string pretty_format(const std::string& compact) {
     return std::move(f.out);
 }
 
-// encode_pretty: struct or vector<struct> -> pretty-formatted ASON
+// encode_pretty: struct or vector<struct> -> pretty-formatted ASUN
 template <typename T>
 std::string encode_pretty(const T& v) {
     return pretty_format(encode(v));
 }
 
-// encode_pretty_typed: struct or vector<struct> -> pretty-formatted ASON with type annotations
+// encode_pretty_typed: struct or vector<struct> -> pretty-formatted ASUN with type annotations
 template <typename T>
 std::string encode_pretty_typed(const T& v) {
     return pretty_format(encode_typed(v));
 }
 
-// decode: ASON string -> T (auto-detects single struct vs vector)
+// decode: ASUN string -> T (auto-detects single struct vs vector)
 // For single: {schema}:(data)
 // For vector: [{schema}]:(data1),(data2),...
 template <typename T>
 T decode(std::string_view input) {
     if constexpr (detail::is_vector<T>::value) {
         using Elem = typename T::value_type;
-        static_assert(AsonFields<Elem>::defined, "ASON_FIELDS not defined for element type");
+        static_assert(AsunFields<Elem>::defined, "ASUN_FIELDS not defined for element type");
         const char* pos = input.data();
         const char* end = pos + input.size();
         detail::skip_whitespace_and_comments(pos, end);
@@ -1515,7 +1515,7 @@ T decode(std::string_view input) {
         pos++;
         int field_map[detail::ParsedSchema::MAX_FIELDS];
         for (int fi = 0; fi < schema.count; fi++)
-            field_map[fi] = AsonFields<Elem>::find_field(schema.fields[fi]);
+            field_map[fi] = AsunFields<Elem>::find_field(schema.fields[fi]);
         T result;
         for (;;) {
             detail::skip_whitespace_and_comments(pos, end);
@@ -1532,7 +1532,7 @@ T decode(std::string_view input) {
                     else throw Error("expected ',' or ')'");
                 }
                 if (field_map[i] >= 0) {
-                    AsonFields<Elem>::load_field(pos, end, elem, field_map[i]);
+                    AsunFields<Elem>::load_field(pos, end, elem, field_map[i]);
                 } else {
                     detail::skip_value(pos, end);
                 }
@@ -1551,7 +1551,7 @@ T decode(std::string_view input) {
         }
         return result;
     } else {
-        static_assert(AsonFields<T>::defined, "ASON_FIELDS not defined for this type");
+        static_assert(AsunFields<T>::defined, "ASUN_FIELDS not defined for this type");
         const char* pos = input.data();
         const char* end = pos + input.size();
         detail::skip_whitespace_and_comments(pos, end);
@@ -1564,7 +1564,7 @@ T decode(std::string_view input) {
         detail::skip_whitespace_and_comments(pos, end);
         int field_map[detail::ParsedSchema::MAX_FIELDS];
         for (int fi = 0; fi < schema.count; fi++)
-            field_map[fi] = AsonFields<T>::find_field(schema.fields[fi]);
+            field_map[fi] = AsunFields<T>::find_field(schema.fields[fi]);
         if (pos >= end || *pos != '(') throw Error("expected '('");
         pos++;
         for (int i = 0; i < schema.count; i++) {
@@ -1576,7 +1576,7 @@ T decode(std::string_view input) {
                 else throw Error("expected ',' or ')'");
             }
             if (field_map[i] >= 0) {
-                AsonFields<T>::load_field(pos, end, result, field_map[i]);
+                AsunFields<T>::load_field(pos, end, result, field_map[i]);
             } else {
                 detail::skip_value(pos, end);
             }
@@ -1590,7 +1590,7 @@ T decode(std::string_view input) {
     }
 }
 
-// encode_bin: struct -> ASON-BIN string
+// encode_bin: struct -> ASUN-BIN string
 template <typename T>
 std::string encode_bin(const T& v) {
     std::string buf;
@@ -1599,7 +1599,7 @@ std::string encode_bin(const T& v) {
     return buf;
 }
 
-// decode_bin: ASON-BIN string -> struct
+// decode_bin: ASUN-BIN string -> struct
 template <typename T>
 T decode_bin(std::string_view input) {
     T result{};
@@ -1610,123 +1610,123 @@ T decode_bin(std::string_view input) {
 }
 
 // ============================================================================
-// ASON_FIELDS macro — reflection for structs
+// ASUN_FIELDS macro — reflection for structs
 // ============================================================================
 
 // Helper macros
-#define ASON_FIELD_NAME(field, name, ...) name
-#define ASON_FIELD_TYPE(field, name, type_str, ...) type_str
-#define ASON_FIELD_MEMBER(field, ...) field
+#define ASUN_FIELD_NAME(field, name, ...) name
+#define ASUN_FIELD_TYPE(field, name, type_str, ...) type_str
+#define ASUN_FIELD_MEMBER(field, ...) field
 
 // Count fields
-#define ASON_PP_NARG(...)  ASON_PP_NARG_(__VA_ARGS__, ASON_PP_RSEQ_N())
-#define ASON_PP_NARG_(...) ASON_PP_ARG_N(__VA_ARGS__)
-#define ASON_PP_ARG_N(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,_17,_18,_19,_20,_21,_22,_23,_24,_25,_26,_27,_28,_29,_30,_31,_32,N,...) N
-#define ASON_PP_RSEQ_N() 32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
+#define ASUN_PP_NARG(...)  ASUN_PP_NARG_(__VA_ARGS__, ASUN_PP_RSEQ_N())
+#define ASUN_PP_NARG_(...) ASUN_PP_ARG_N(__VA_ARGS__)
+#define ASUN_PP_ARG_N(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,_17,_18,_19,_20,_21,_22,_23,_24,_25,_26,_27,_28,_29,_30,_31,_32,N,...) N
+#define ASUN_PP_RSEQ_N() 32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
 
 // Expansion helpers
-#define ASON_EXPAND(...) __VA_ARGS__
-#define ASON_CAT(a,b) ASON_CAT_(a,b)
-#define ASON_CAT_(a,b) a##b
+#define ASUN_EXPAND(...) __VA_ARGS__
+#define ASUN_CAT(a,b) ASUN_CAT_(a,b)
+#define ASUN_CAT_(a,b) a##b
 
-// Per-field schema emission (idx-based, for use with ASON_FOR_EACH)
-#define ASON_SCHEMA_ITEM_1(idx, f) \
+// Per-field schema emission (idx-based, for use with ASUN_FOR_EACH)
+#define ASUN_SCHEMA_ITEM_1(idx, f) \
     if (idx > 0) buf.push_back(','); \
-    ::ason::detail::append_schema_name(buf, ASON_FIELD_NAME f); \
-    ::ason::detail::write_field_schema<decltype(std::declval<Self>().ASON_FIELD_MEMBER f)>(buf, typed);
+    ::asun::detail::append_schema_name(buf, ASUN_FIELD_NAME f); \
+    ::asun::detail::write_field_schema<decltype(std::declval<Self>().ASUN_FIELD_MEMBER f)>(buf, typed);
 
-// Per-field dump (idx-based, for use with ASON_FOR_EACH)
-#define ASON_DUMP_ITEM_1(idx, f) \
-    if (idx > 0) buf.push_back(','); ::ason::dump_value(buf, v.ASON_FIELD_MEMBER f);
+// Per-field dump (idx-based, for use with ASUN_FOR_EACH)
+#define ASUN_DUMP_ITEM_1(idx, f) \
+    if (idx > 0) buf.push_back(','); ::asun::dump_value(buf, v.ASUN_FIELD_MEMBER f);
 
 // Per-field binary dump
-#define ASON_DUMP_BIN_ITEM_1(idx, f) \
-    ::ason::dump_bin_value(buf, v.ASON_FIELD_MEMBER f);
+#define ASUN_DUMP_BIN_ITEM_1(idx, f) \
+    ::asun::dump_bin_value(buf, v.ASUN_FIELD_MEMBER f);
 
 // Per-field load dispatch
-#define ASON_LOAD_CASE_1(idx, f) \
-    case idx: ::ason::load_value(pos, end, out.ASON_FIELD_MEMBER f); break;
+#define ASUN_LOAD_CASE_1(idx, f) \
+    case idx: ::asun::load_value(pos, end, out.ASUN_FIELD_MEMBER f); break;
 
 // Per-field binary load
-#define ASON_LOAD_BIN_ITEM_1(idx, f) \
-    ::ason::load_bin_value(pos, end, out.ASON_FIELD_MEMBER f);
+#define ASUN_LOAD_BIN_ITEM_1(idx, f) \
+    ::asun::load_bin_value(pos, end, out.ASUN_FIELD_MEMBER f);
 
 // Per-field name match
-#define ASON_FIELDMAP_1(idx, f) \
-    if (name == ASON_FIELD_NAME f) return idx;
+#define ASUN_FIELDMAP_1(idx, f) \
+    if (name == ASUN_FIELD_NAME f) return idx;
 
 // Main macro for 1-32 fields -- we use X-macro style
 
-#define ASON_FOR_EACH_1(what,  f1)                         what(0,f1)
-#define ASON_FOR_EACH_2(what,  f1,f2)                      ASON_FOR_EACH_1(what,f1)  what(1,f2)
-#define ASON_FOR_EACH_3(what,  f1,f2,f3)                   ASON_FOR_EACH_2(what,f1,f2) what(2,f3)
-#define ASON_FOR_EACH_4(what,  f1,f2,f3,f4)                ASON_FOR_EACH_3(what,f1,f2,f3) what(3,f4)
-#define ASON_FOR_EACH_5(what,  f1,f2,f3,f4,f5)             ASON_FOR_EACH_4(what,f1,f2,f3,f4) what(4,f5)
-#define ASON_FOR_EACH_6(what,  f1,f2,f3,f4,f5,f6)          ASON_FOR_EACH_5(what,f1,f2,f3,f4,f5) what(5,f6)
-#define ASON_FOR_EACH_7(what,  f1,f2,f3,f4,f5,f6,f7)       ASON_FOR_EACH_6(what,f1,f2,f3,f4,f5,f6) what(6,f7)
-#define ASON_FOR_EACH_8(what,  f1,f2,f3,f4,f5,f6,f7,f8)    ASON_FOR_EACH_7(what,f1,f2,f3,f4,f5,f6,f7) what(7,f8)
-#define ASON_FOR_EACH_9(what,  f1,f2,f3,f4,f5,f6,f7,f8,f9) ASON_FOR_EACH_8(what,f1,f2,f3,f4,f5,f6,f7,f8) what(8,f9)
-#define ASON_FOR_EACH_10(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10) ASON_FOR_EACH_9(what,f1,f2,f3,f4,f5,f6,f7,f8,f9) what(9,f10)
-#define ASON_FOR_EACH_11(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11) ASON_FOR_EACH_10(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10) what(10,f11)
-#define ASON_FOR_EACH_12(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12) ASON_FOR_EACH_11(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11) what(11,f12)
-#define ASON_FOR_EACH_13(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13) ASON_FOR_EACH_12(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12) what(12,f13)
-#define ASON_FOR_EACH_14(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14) ASON_FOR_EACH_13(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13) what(13,f14)
-#define ASON_FOR_EACH_15(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15) ASON_FOR_EACH_14(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14) what(14,f15)
-#define ASON_FOR_EACH_16(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16) ASON_FOR_EACH_15(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15) what(15,f16)
-#define ASON_FOR_EACH_17(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17) ASON_FOR_EACH_16(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16) what(16,f17)
-#define ASON_FOR_EACH_18(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18) ASON_FOR_EACH_17(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17) what(17,f18)
-#define ASON_FOR_EACH_19(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19) ASON_FOR_EACH_18(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18) what(18,f19)
-#define ASON_FOR_EACH_20(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20) ASON_FOR_EACH_19(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19) what(19,f20)
+#define ASUN_FOR_EACH_1(what,  f1)                         what(0,f1)
+#define ASUN_FOR_EACH_2(what,  f1,f2)                      ASUN_FOR_EACH_1(what,f1)  what(1,f2)
+#define ASUN_FOR_EACH_3(what,  f1,f2,f3)                   ASUN_FOR_EACH_2(what,f1,f2) what(2,f3)
+#define ASUN_FOR_EACH_4(what,  f1,f2,f3,f4)                ASUN_FOR_EACH_3(what,f1,f2,f3) what(3,f4)
+#define ASUN_FOR_EACH_5(what,  f1,f2,f3,f4,f5)             ASUN_FOR_EACH_4(what,f1,f2,f3,f4) what(4,f5)
+#define ASUN_FOR_EACH_6(what,  f1,f2,f3,f4,f5,f6)          ASUN_FOR_EACH_5(what,f1,f2,f3,f4,f5) what(5,f6)
+#define ASUN_FOR_EACH_7(what,  f1,f2,f3,f4,f5,f6,f7)       ASUN_FOR_EACH_6(what,f1,f2,f3,f4,f5,f6) what(6,f7)
+#define ASUN_FOR_EACH_8(what,  f1,f2,f3,f4,f5,f6,f7,f8)    ASUN_FOR_EACH_7(what,f1,f2,f3,f4,f5,f6,f7) what(7,f8)
+#define ASUN_FOR_EACH_9(what,  f1,f2,f3,f4,f5,f6,f7,f8,f9) ASUN_FOR_EACH_8(what,f1,f2,f3,f4,f5,f6,f7,f8) what(8,f9)
+#define ASUN_FOR_EACH_10(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10) ASUN_FOR_EACH_9(what,f1,f2,f3,f4,f5,f6,f7,f8,f9) what(9,f10)
+#define ASUN_FOR_EACH_11(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11) ASUN_FOR_EACH_10(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10) what(10,f11)
+#define ASUN_FOR_EACH_12(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12) ASUN_FOR_EACH_11(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11) what(11,f12)
+#define ASUN_FOR_EACH_13(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13) ASUN_FOR_EACH_12(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12) what(12,f13)
+#define ASUN_FOR_EACH_14(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14) ASUN_FOR_EACH_13(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13) what(13,f14)
+#define ASUN_FOR_EACH_15(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15) ASUN_FOR_EACH_14(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14) what(14,f15)
+#define ASUN_FOR_EACH_16(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16) ASUN_FOR_EACH_15(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15) what(15,f16)
+#define ASUN_FOR_EACH_17(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17) ASUN_FOR_EACH_16(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16) what(16,f17)
+#define ASUN_FOR_EACH_18(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18) ASUN_FOR_EACH_17(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17) what(17,f18)
+#define ASUN_FOR_EACH_19(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19) ASUN_FOR_EACH_18(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18) what(18,f19)
+#define ASUN_FOR_EACH_20(what, f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19,f20) ASUN_FOR_EACH_19(what,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f19) what(19,f20)
 
-#define ASON_FOR_EACH_(N, what, ...) ASON_CAT(ASON_FOR_EACH_, N)(what, __VA_ARGS__)
-#define ASON_FOR_EACH(what, ...) ASON_FOR_EACH_(ASON_PP_NARG(__VA_ARGS__), what, __VA_ARGS__)
+#define ASUN_FOR_EACH_(N, what, ...) ASUN_CAT(ASUN_FOR_EACH_, N)(what, __VA_ARGS__)
+#define ASUN_FOR_EACH(what, ...) ASUN_FOR_EACH_(ASUN_PP_NARG(__VA_ARGS__), what, __VA_ARGS__)
 
-// ASON_FIELDS — the main user-facing macro
+// ASUN_FIELDS — the main user-facing macro
 // Usage:
 //   struct User { int64_t id; std::string name; bool active; };
-//   ASON_FIELDS(User,
+//   ASUN_FIELDS(User,
 //     (id,   "id",   "int"),
 //     (name, "name", "str"),
 //     (active,"active","bool"))
 //
 // The third element is retained for declaration readability; typed schema output is inferred from C++ types.
 
-#define ASON_FIELDS(StructName, ...) \
-    template <> struct ason::AsonFields<StructName> { \
+#define ASUN_FIELDS(StructName, ...) \
+    template <> struct asun::AsunFields<StructName> { \
         using Self = StructName; \
         static constexpr bool defined = true; \
-        static constexpr int field_count = ASON_PP_NARG(__VA_ARGS__); \
+        static constexpr int field_count = ASUN_PP_NARG(__VA_ARGS__); \
         static void write_schema(std::string& buf, bool typed) { \
-            ASON_FOR_EACH(ASON_SCHEMA_ITEM_1, __VA_ARGS__) \
+            ASUN_FOR_EACH(ASUN_SCHEMA_ITEM_1, __VA_ARGS__) \
         } \
         static void dump_fields(std::string& buf, const Self& v) { \
-            ASON_FOR_EACH(ASON_DUMP_ITEM_1, __VA_ARGS__) \
+            ASUN_FOR_EACH(ASUN_DUMP_ITEM_1, __VA_ARGS__) \
         } \
         static void dump_bin_fields(std::string& buf, const Self& v) { \
-            ASON_FOR_EACH(ASON_DUMP_BIN_ITEM_1, __VA_ARGS__) \
+            ASUN_FOR_EACH(ASUN_DUMP_BIN_ITEM_1, __VA_ARGS__) \
         } \
         static int find_field(std::string_view name) { \
-            ASON_FOR_EACH(ASON_FIELDMAP_1, __VA_ARGS__) \
+            ASUN_FOR_EACH(ASUN_FIELDMAP_1, __VA_ARGS__) \
             return -1; \
         } \
-        static void build_field_map(const ::ason::detail::ParsedSchema& schema, int* out) { \
+        static void build_field_map(const ::asun::detail::ParsedSchema& schema, int* out) { \
             for (int i = 0; i < schema.count; i++) \
                 out[i] = find_field(schema.fields[i]); \
         } \
         static void load_field(const char*& pos, const char* end, Self& out, int idx) { \
             switch (idx) { \
-                ASON_FOR_EACH(ASON_LOAD_CASE_1, __VA_ARGS__) \
-                default: ::ason::detail::skip_value(pos, end); break; \
+                ASUN_FOR_EACH(ASUN_LOAD_CASE_1, __VA_ARGS__) \
+                default: ::asun::detail::skip_value(pos, end); break; \
             } \
         } \
         static void load_bin_fields(const char*& pos, const char* end, Self& out) { \
-            ASON_FOR_EACH(ASON_LOAD_BIN_ITEM_1, __VA_ARGS__) \
+            ASUN_FOR_EACH(ASUN_LOAD_BIN_ITEM_1, __VA_ARGS__) \
         } \
     };
 
-// Convenience: ASON_FIELDS with auto-inferred types (no explicit type strings needed)
+// Convenience: ASUN_FIELDS with auto-inferred types (no explicit type strings needed)
 // For typed output, types are deduced from the member types via TypeName<>.
 
-} // namespace ason
+} // namespace asun
 
-#endif // ASON_HPP
+#endif // ASUN_HPP
