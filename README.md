@@ -4,9 +4,9 @@
 [![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Header-only C++17 support for [ASUN](https://github.com/asun-lab/asun), a schema-driven data format for compact structured payloads.
+Header-only C++17 support for [ASUN](https://github.com/asunLab/asun), a schema-driven data format for compact structured payloads.
 
-[中文文档](README_CN.md)
+[中文文档](https://github.com/asunLab/asun-cpp/blob/main/README_CN.md)
 
 ## Why ASUN
 
@@ -19,8 +19,10 @@ ASUN writes the schema once and stores repeated rows as tuples:
 ]
 ```
 
-```text
-[{id@int,name@str,active@bool}]:(1,Alice,true),(2,Bob,false)
+```asun
+[{id,name,active}]:
+    (1,Alice,true),
+    (2,Bob,false)
 ```
 
 That cuts repeated keys, reduces payload size, and keeps typed structure visible.

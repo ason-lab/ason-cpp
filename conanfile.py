@@ -10,7 +10,7 @@ class AsunCppConan(ConanFile):
     package_type = "header-library"
     license = "MIT"
     author = "asun contributors"
-    url = "https://github.com/asun-lab/asun/tree/main/asun-cpp"
+    url = "https://github.com/asunLab/asun/tree/main/asun-cpp"
     description = "Header-only C++17 ASUN (Array-Schema Unified Notation) library"
     topics = ("asun", "serialization", "schema", "header-only", "data-format")
     settings = "os", "arch", "compiler", "build_type"

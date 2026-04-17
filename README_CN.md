@@ -4,9 +4,9 @@
 [![Header-only](https://img.shields.io/badge/header--only-yes-green.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-面向 [ASUN](https://github.com/asun-lab/asun) 的 C++17 仅头文件实现。ASUN 是一种适合紧凑结构化载荷的 Schema 驱动数据格式。
+面向 [ASUN](https://github.com/asunLab/asun) 的 C++17 仅头文件实现。ASUN 是一种适合紧凑结构化载荷的 Schema 驱动数据格式。
 
-[English](README.md)
+[English](https://github.com/asunLab/asun-cpp/blob/main/README.md)
 
 ## 为什么用 ASUN
 
@@ -19,8 +19,10 @@ ASUN 只写一次 Schema，重复行以元组形式保存：
 ]
 ```
 
-```text
-[{id@int,name@str,active@bool}]:(1,Alice,true),(2,Bob,false)
+```asun
+[{id,name,active}]:
+    (1,Alice,true),
+    (2,Bob,false)
 ```
 
 这可以减少重复键名、减小体积，同时保留清晰的类型结构。

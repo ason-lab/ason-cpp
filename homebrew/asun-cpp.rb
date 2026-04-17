@@ -1,10 +1,10 @@
 class AsunCpp < Formula
   desc "Header-only C++17 ASUN (Array-Schema Unified Notation) library"
-  homepage "https://github.com/asun-lab/asun/tree/main/asun-cpp"
-  url "https://github.com/asun-lab/asun/archive/refs/tags/v1.0.0.tar.gz"
+  homepage "https://github.com/asunLab/asun/tree/main/asun-cpp"
+  url "https://github.com/asunLab/asun/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "REPLACE_WITH_RELEASE_SHA256"
   license "MIT"
-  head "https://github.com/asun-lab/asun.git", branch: "main"
+  head "https://github.com/asunLab/asun.git", branch: "main"
 
   depends_on "cmake" => :build
 

@@ -2,7 +2,7 @@
   "name": "asun-cpp",
   "version-string": "1.0.0",
   "description": "Header-only C++17 ASUN (Array-Schema Unified Notation) library",
-  "homepage": "https://github.com/asun-lab/asun/tree/main/asun-cpp",
+  "homepage": "https://github.com/asunLab/asun/tree/main/asun-cpp",
   "license": "MIT",
   "dependencies": []
 }
