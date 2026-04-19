@@ -8,24 +8,34 @@ Header-only C++17 support for [ASUN](https://github.com/asunLab/asun), a schema-
 
 [中文文档](https://github.com/asunLab/asun-cpp/blob/main/README_CN.md)
 
-## Why ASUN
+## Why ASUN?
 
-ASUN writes the schema once and stores repeated rows as tuples:
+**json**
+
+Standard JSON repeats every field name in every record. When you send structured data to an LLM, over an API, or across services, that repetition wastes tokens, bytes, and attention:
 
 ```json
 [
   { "id": 1, "name": "Alice", "active": true },
-  { "id": 2, "name": "Bob", "active": false }
+  { "id": 2, "name": "Bob", "active": false },
+  { "id": 3, "name": "Carol", "active": true }
 ]
 ```
 
+**asun**
+
+ASUN declares the schema **once** and streams data as compact tuples:
+
 ```asun
-[{id,name,active}]:
-    (1,Alice,true),
-    (2,Bob,false)
+[{id, name, active}]:
+  (1,Alice,true),
+  (2,Bob,false),
+  (3,Carol,true)
 ```
 
-That cuts repeated keys, reduces payload size, and keeps typed structure visible.
+**Fewer tokens. Smaller payloads. Clearer structure, and faster parsing than repeated-object JSON.**
+
+---
 
 ## Highlights
 

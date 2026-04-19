@@ -805,9 +805,6 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
             }
         }
         skip_whitespace(pos, end);
-        if (pos < end && *pos == ':') {
-            throw Error("legacy ':' field annotations are not supported; use '@'");
-        }
         // Validate and skip optional annotation after '@'
         if (pos < end && *pos == '@') {
             pos++;
