@@ -1,6 +1,6 @@
 #pragma once
 // ============================================================================
-// ASUN — Array-Schema Unified Notation  (C++17 header-only, SIMD-accelerated)
+// ASUN — Array-Schema Unified Notation  (C++17 or later, header-only, SIMD-accelerated)
 //
 // API:
 //   asun::encode(object)           -> std::string       (serialize single struct)
@@ -110,6 +110,8 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     uint8x16_t vrp    = vdupq_n_u8(')');
     uint8x16_t vlb    = vdupq_n_u8('[');
     uint8x16_t vrb    = vdupq_n_u8(']');
+    uint8x16_t vlc    = vdupq_n_u8('{');
+    uint8x16_t vrc    = vdupq_n_u8('}');
     uint8x16_t vla    = vdupq_n_u8('<');
     uint8x16_t vra    = vdupq_n_u8('>');
     uint8x16_t vcolon = vdupq_n_u8(':');
@@ -125,6 +127,8 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         r = vorrq_u8(r, vceqq_u8(chunk, vrp));
         r = vorrq_u8(r, vceqq_u8(chunk, vlb));
         r = vorrq_u8(r, vceqq_u8(chunk, vrb));
+        r = vorrq_u8(r, vceqq_u8(chunk, vlc));
+        r = vorrq_u8(r, vceqq_u8(chunk, vrc));
         r = vorrq_u8(r, vceqq_u8(chunk, vla));
         r = vorrq_u8(r, vceqq_u8(chunk, vra));
         r = vorrq_u8(r, vceqq_u8(chunk, vcolon));
@@ -135,7 +139,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '{' || b == '}' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -174,6 +178,8 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     __m128i vrp     = _mm_set1_epi8(')');
     __m128i vlb     = _mm_set1_epi8('[');
     __m128i vrb     = _mm_set1_epi8(']');
+    __m128i vlc     = _mm_set1_epi8('{');
+    __m128i vrc     = _mm_set1_epi8('}');
     __m128i vla     = _mm_set1_epi8('<');
     __m128i vra     = _mm_set1_epi8('>');
     __m128i vcolon  = _mm_set1_epi8(':');
@@ -190,6 +196,8 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrp));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vlb));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrb));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vlc));
+        r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vrc));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vla));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vra));
         r = _mm_or_si128(r, _mm_cmpeq_epi8(chunk, vcolon));
@@ -200,7 +208,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '{' || b == '}' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -220,7 +228,7 @@ inline bool has_special_chars(const uint8_t* ptr, size_t len) {
     for (size_t i = 0; i < len; i++) {
         uint8_t b = ptr[i];
         if (b < 0x20 || b == ',' || b == '@' || b == '(' || b == ')' ||
-            b == '[' || b == ']' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
+            b == '[' || b == ']' || b == '{' || b == '}' || b == '<' || b == '>' || b == ':' || b == '"' || b == '\\')
             return true;
     }
     return false;
@@ -341,28 +349,45 @@ inline void append_f64(std::string& buf, double v) {
 // String quoting / escaping helpers
 // ============================================================================
 
+// Returns true if the trimmed token would re-decode as a non-string scalar.
+inline bool token_looks_like_number(std::string_view s) {
+    if (s.empty()) return false;
+    size_t i = 0;
+    if (s[i] == '+' || s[i] == '-') i++;
+    bool has_digit = false;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9') { i++; has_digit = true; }
+    if (i < s.size() && s[i] == '.') {
+        i++;
+        while (i < s.size() && s[i] >= '0' && s[i] <= '9') { i++; has_digit = true; }
+    }
+    if (i < s.size() && (s[i] == 'e' || s[i] == 'E')) {
+        i++;
+        if (i < s.size() && (s[i] == '+' || s[i] == '-')) i++;
+        bool has_exp = false;
+        while (i < s.size() && s[i] >= '0' && s[i] <= '9') { i++; has_exp = true; }
+        if (!has_exp) return false;
+    }
+    return has_digit && i == s.size();
+}
+
 inline bool string_needs_quoting(std::string_view s) {
     if (s.empty()) return true;
-    if (s.front() == ' ' || s.back() == ' ') return true;
+    char f = s.front(), e = s.back();
+    if (f == ' ' || f == '\t' || f == '\n' || f == '\r') return true;
+    if (e == ' ' || e == '\t' || e == '\n' || e == '\r') return true;
     if (s == "true" || s == "false") return true;
 
     auto ptr = reinterpret_cast<const uint8_t*>(s.data());
     auto len = s.size();
 
-    bool has_special = simd::has_special_chars(ptr, len);
-    if (has_special) return true;
+    if (simd::has_special_chars(ptr, len)) return true;
 
-    // Check if it looks like a number -> must quote
-    size_t start = 0;
-    if (len > 0 && s[0] == '-') start = 1;
-    if (start < len) {
-        bool could_be_number = true;
-        for (size_t i = start; i < len; i++) {
-            char c = s[i];
-            if (!((c >= '0' && c <= '9') || c == '.')) { could_be_number = false; break; }
-        }
-        if (could_be_number && len > start) return true;
+    // Block-comment lookalike: any "/*" substring forces quoting.
+    for (size_t i = 0; i + 1 < len; i++) {
+        if (s[i] == '/' && s[i + 1] == '*') return true;
     }
+
+    if (token_looks_like_number(s)) return true;
     return false;
 }
 
@@ -381,8 +406,19 @@ inline void append_escaped(std::string& buf, std::string_view s) {
             case '"':  buf.append("\\\"", 2); break;
             case '\\': buf.append("\\\\", 2); break;
             case '\n': buf.append("\\n", 2); break;
+            case '\r': buf.append("\\r", 2); break;
             case '\t': buf.append("\\t", 2); break;
-            default:   buf.push_back(b); break;  // other control chars pass through
+            case '\b': buf.append("\\b", 2); break;
+            case '\f': buf.append("\\f", 2); break;
+            default:
+                if (b < 0x20 || b == 0x7f) {
+                    char hex[8];
+                    std::snprintf(hex, sizeof(hex), "\\u%04x", b);
+                    buf.append(hex, 6);
+                } else {
+                    buf.push_back(static_cast<char>(b));
+                }
+                break;
         }
         start++;
     }
@@ -616,13 +652,23 @@ inline std::string parse_quoted_string(const char*& pos, const char* end) {
             switch (esc) {
                 case '"':  result.push_back('"'); break;
                 case '\\': result.push_back('\\'); break;
+                case '/':  result.push_back('/'); break;
                 case 'n':  result.push_back('\n'); break;
+                case 'r':  result.push_back('\r'); break;
                 case 't':  result.push_back('\t'); break;
+                case 'b':  result.push_back('\b'); break;
+                case 'f':  result.push_back('\f'); break;
                 case ',':  result.push_back(','); break;
                 case '(':  result.push_back('('); break;
                 case ')':  result.push_back(')'); break;
                 case '[':  result.push_back('['); break;
                 case ']':  result.push_back(']'); break;
+                case '{':  result.push_back('{'); break;
+                case '}':  result.push_back('}'); break;
+                case '@':  result.push_back('@'); break;
+                case '<':  result.push_back('<'); break;
+                case '>':  result.push_back('>'); break;
+                case ':':  result.push_back(':'); break;
                 case 'u': {
                     if (pos + 4 > end) throw Error("invalid unicode escape");
                     char hex[5] = {pos[0], pos[1], pos[2], pos[3], 0};
@@ -683,10 +729,20 @@ inline std::string parse_plain_value(const char*& pos, const char* end) {
                 case ')': result.push_back(')'); break;
                 case '[': result.push_back('['); break;
                 case ']': result.push_back(']'); break;
+                case '{': result.push_back('{'); break;
+                case '}': result.push_back('}'); break;
+                case '@': result.push_back('@'); break;
+                case '<': result.push_back('<'); break;
+                case '>': result.push_back('>'); break;
+                case ':': result.push_back(':'); break;
+                case '/': result.push_back('/'); break;
                 case '"': result.push_back('"'); break;
                 case '\\':result.push_back('\\'); break;
                 case 'n': result.push_back('\n'); break;
+                case 'r': result.push_back('\r'); break;
                 case 't': result.push_back('\t'); break;
+                case 'b': result.push_back('\b'); break;
+                case 'f': result.push_back('\f'); break;
                 case 'u': {
                     if (p + 4 >= vend) throw Error("invalid unicode escape");
                     char hex[5] = {p[1], p[2], p[3], p[4], 0};
