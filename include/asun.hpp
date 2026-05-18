@@ -620,8 +620,10 @@ inline bool is_delim(char c) {
     return c == ',' || c == ')' || c == ']' || c == '>' || c == ':' || c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-// Parse quoted string — handles escape sequences; zero-copy when no escapes
-inline std::string parse_quoted_string(const char*& pos, const char* end) {
+// Parse quoted string into `result` — handles escape sequences;
+// zero-copy assign when no escapes. Reuses `result`'s existing buffer
+// (saves the temp+move pair in the typical hot path).
+inline void parse_quoted_string_into(std::string& result, const char*& pos, const char* end) {
     pos++; // skip opening "
     const char* start = pos;
 
@@ -632,19 +634,20 @@ inline std::string parse_quoted_string(const char*& pos, const char* end) {
     const char* scan = pos + offset;
 
     if (scan < end && *scan == '"') {
-        // No escapes — direct construction (skip ArrayList build)
+        // No escapes — direct assign into the caller's string slot.
+        result.assign(start, static_cast<size_t>(scan - start));
         pos = scan + 1;
-        return std::string(start, static_cast<size_t>(scan - start));
+        return;
     }
 
     // Slow path: has escapes
-    std::string result;
+    result.clear();
     if (scan > start) result.append(start, scan - start);
     pos = scan;
 
     while (pos < end) {
         char b = *pos;
-        if (b == '"') { pos++; return result; }
+        if (b == '"') { pos++; return; }
         if (b == '\\') {
             pos++;
             if (pos >= end) throw Error("unclosed string");
@@ -697,8 +700,83 @@ inline std::string parse_quoted_string(const char*& pos, const char* end) {
     throw Error("unclosed string");
 }
 
-// Parse plain (unquoted) value — returns string_view into original buffer
-inline std::string parse_plain_value(const char*& pos, const char* end) {
+// By-value parser for callers (e.g. schema parsing) that allocate a fresh
+// std::string. Kept identical to the pre-optimisation body to avoid any risk
+// of perturbing non-decode-hot-path callers.
+inline std::string parse_quoted_string(const char*& pos, const char* end) {
+    pos++; // skip opening "
+    const char* start = pos;
+
+    auto ptr = reinterpret_cast<const uint8_t*>(pos);
+    size_t remaining = end - pos;
+    size_t offset = simd::find_quote_or_special(ptr, remaining);
+    const char* scan = pos + offset;
+
+    if (scan < end && *scan == '"') {
+        pos = scan + 1;
+        return std::string(start, static_cast<size_t>(scan - start));
+    }
+
+    std::string result;
+    if (scan > start) result.append(start, scan - start);
+    pos = scan;
+
+    while (pos < end) {
+        char b = *pos;
+        if (b == '"') { pos++; return result; }
+        if (b == '\\') {
+            pos++;
+            if (pos >= end) throw Error("unclosed string");
+            char esc = *pos; pos++;
+            switch (esc) {
+                case '"':  result.push_back('"'); break;
+                case '\\': result.push_back('\\'); break;
+                case '/':  result.push_back('/'); break;
+                case 'n':  result.push_back('\n'); break;
+                case 'r':  result.push_back('\r'); break;
+                case 't':  result.push_back('\t'); break;
+                case 'b':  result.push_back('\b'); break;
+                case 'f':  result.push_back('\f'); break;
+                case ',':  result.push_back(','); break;
+                case '(':  result.push_back('('); break;
+                case ')':  result.push_back(')'); break;
+                case '[':  result.push_back('['); break;
+                case ']':  result.push_back(']'); break;
+                case '{':  result.push_back('{'); break;
+                case '}':  result.push_back('}'); break;
+                case '@':  result.push_back('@'); break;
+                case '<':  result.push_back('<'); break;
+                case '>':  result.push_back('>'); break;
+                case ':':  result.push_back(':'); break;
+                case 'u': {
+                    if (pos + 4 > end) throw Error("invalid unicode escape");
+                    char hex[5] = {pos[0], pos[1], pos[2], pos[3], 0};
+                    unsigned long cp = std::strtoul(hex, nullptr, 16);
+                    if (cp < 0x80) {
+                        result.push_back(static_cast<char>(cp));
+                    } else if (cp < 0x800) {
+                        result.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+                    } else {
+                        result.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+                        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+                    }
+                    pos += 4;
+                    break;
+                }
+                default: throw Error(std::string("invalid escape: \\") + esc);
+            }
+        } else {
+            result.push_back(b);
+            pos++;
+        }
+    }
+    throw Error("unclosed string");
+}
+
+// Parse plain (unquoted) value into `result` — reuses the caller's buffer.
+inline void parse_plain_value_into(std::string& result, const char*& pos, const char* end) {
     const char* start = pos;
     bool has_escape = false;
     while (pos < end) {
@@ -711,6 +789,79 @@ inline std::string parse_plain_value(const char*& pos, const char* end) {
     // Trim trailing whitespace
     while (vend > start && (vend[-1] == ' ' || vend[-1] == '\t')) vend--;
     // Trim leading whitespace
+    while (start < vend && (*start == ' ' || *start == '\t')) start++;
+
+    if (!has_escape) {
+        result.assign(start, static_cast<size_t>(vend - start));
+        return;
+    }
+    // Unescape
+    result.clear();
+    result.reserve(static_cast<size_t>(vend - start));
+    for (const char* p = start; p < vend; ) {
+        if (*p == '\\') {
+            p++;
+            if (p >= vend) throw Error("unexpected EOF in escape");
+            switch (*p) {
+                case ',': result.push_back(','); break;
+                case '(': result.push_back('('); break;
+                case ')': result.push_back(')'); break;
+                case '[': result.push_back('['); break;
+                case ']': result.push_back(']'); break;
+                case '{': result.push_back('{'); break;
+                case '}': result.push_back('}'); break;
+                case '@': result.push_back('@'); break;
+                case '<': result.push_back('<'); break;
+                case '>': result.push_back('>'); break;
+                case ':': result.push_back(':'); break;
+                case '/': result.push_back('/'); break;
+                case '"': result.push_back('"'); break;
+                case '\\':result.push_back('\\'); break;
+                case 'n': result.push_back('\n'); break;
+                case 'r': result.push_back('\r'); break;
+                case 't': result.push_back('\t'); break;
+                case 'b': result.push_back('\b'); break;
+                case 'f': result.push_back('\f'); break;
+                case 'u': {
+                    if (p + 4 >= vend) throw Error("invalid unicode escape");
+                    char hex[5] = {p[1], p[2], p[3], p[4], 0};
+                    unsigned long cp = std::strtoul(hex, nullptr, 16);
+                    if (cp < 0x80) {
+                        result.push_back(static_cast<char>(cp));
+                    } else if (cp < 0x800) {
+                        result.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+                    } else {
+                        result.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+                        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+                    }
+                    p += 4;
+                    break;
+                }
+                default: throw Error(std::string("invalid escape: \\") + *p);
+            }
+            p++;
+        } else {
+            result.push_back(*p);
+            p++;
+        }
+    }
+}
+
+// By-value plain-value parser. Original implementation; hot-path callers
+// (decode of std::string fields) use `parse_plain_value_into` instead.
+inline std::string parse_plain_value(const char*& pos, const char* end) {
+    const char* start = pos;
+    bool has_escape = false;
+    while (pos < end) {
+        char b = *pos;
+        if (b == ',' || b == ')' || b == ']' || b == '>' || b == ':') break;
+        if (b == '\\') { has_escape = true; pos += 2; continue; }
+        pos++;
+    }
+    const char* vend = pos;
+    while (vend > start && (vend[-1] == ' ' || vend[-1] == '\t')) vend--;
     while (start < vend && (*start == ' ' || *start == '\t')) start++;
 
     if (!has_escape) {
@@ -776,6 +927,16 @@ inline std::string parse_string_value(const char*& pos, const char* end) {
     if (pos >= end) return {};
     if (*pos == '"') return parse_quoted_string(pos, end);
     return parse_plain_value(pos, end);
+}
+
+// In-place string parser: writes directly into `out`, reusing its buffer.
+// Saves a temp std::string + move pair on every field, which is the hottest
+// per-row cost in deserialize-heavy workloads.
+inline void parse_string_value_into(std::string& out, const char*& pos, const char* end) {
+    skip_whitespace_and_comments(pos, end);
+    if (pos >= end) { out.clear(); return; }
+    if (*pos == '"') { parse_quoted_string_into(out, pos, end); return; }
+    parse_plain_value_into(out, pos, end);
 }
 
 // Stack-based schema result — zero heap allocation
@@ -999,7 +1160,7 @@ inline void load_value(const char*& pos, const char* end, char& out) {
 }
 
 inline void load_value(const char*& pos, const char* end, std::string& out) {
-    out = detail::parse_string_value(pos, end);
+    detail::parse_string_value_into(out, pos, end);
 }
 
 template <typename T>
@@ -1020,9 +1181,10 @@ void load_value(const char*& pos, const char* end, std::vector<T>& out) {
             } else break;
         }
         first = false;
-        T elem;
-        load_value(pos, end, elem);
-        out.push_back(std::move(elem));
+        // Load directly into the freshly emplaced slot — saves a temp T +
+        // move on every element. Saves a full string move per std::string
+        // field for nested struct vectors.
+        load_value(pos, end, out.emplace_back());
     }
 }
 
@@ -1570,12 +1732,25 @@ T decode(std::string_view input) {
         for (int fi = 0; fi < schema.count; fi++)
             field_map[fi] = AsunFields<Elem>::find_field(schema.fields[fi]);
         T result;
+        // Estimate row count from remaining bytes to skip vector reallocs.
+        // The minimum row body is `(...)` (3 chars) but typical rows are
+        // ~30+ bytes. Bias the estimate slightly low (`/40`) so we reserve
+        // close to but not over the actual count.
+        {
+            size_t remaining = static_cast<size_t>(end - pos);
+            size_t hint = remaining / 40;
+            if (hint > 4) result.reserve(hint);
+        }
         for (;;) {
             detail::skip_whitespace_and_comments(pos, end);
             if (pos >= end) break;
             if (*pos != '(') break;
             pos++;
-            Elem elem{};
+            // Emplace into the target vector and load directly into it,
+            // skipping the temp Elem + per-field move on push_back. For
+            // structs with several std::string fields this saves a full
+            // round of string move-construction per row.
+            Elem& elem = result.emplace_back();
             for (int i = 0; i < schema.count; i++) {
                 detail::skip_whitespace_and_comments(pos, end);
                 if (pos < end && *pos == ')') break;
@@ -1593,7 +1768,6 @@ T decode(std::string_view input) {
             detail::skip_remaining_tuple_values(pos, end);
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ')') pos++;
-            result.push_back(std::move(elem));
 
             detail::skip_whitespace_and_comments(pos, end);
             if (pos < end && *pos == ',') {
