@@ -1267,13 +1267,60 @@ load_value(const char*& pos, const char* end, T& out) {
 // Binary dump_bin_value / load_bin_value specializations
 // ============================================================================
 
+// LEB128 varint + zigzag primitives (must match the Rust reference format).
+inline uint64_t bin_zigzag_encode(int64_t v) {
+    return static_cast<uint64_t>((v << 1) ^ (v >> 63));
+}
+inline int64_t bin_zigzag_decode(uint64_t v) {
+    return static_cast<int64_t>(v >> 1) ^ -static_cast<int64_t>(v & 1);
+}
+
+inline void bin_write_uvarint(std::string& buf, uint64_t v) {
+    while (v >= 0x80) {
+        buf.push_back(static_cast<char>(static_cast<uint8_t>(v) | 0x80));
+        v >>= 7;
+    }
+    buf.push_back(static_cast<char>(static_cast<uint8_t>(v)));
+}
+inline void bin_write_ivarint(std::string& buf, int64_t v) {
+    bin_write_uvarint(buf, bin_zigzag_encode(v));
+}
+
+inline uint64_t bin_read_uvarint(const char*& pos, const char* end) {
+    uint64_t result = 0;
+    uint32_t shift = 0;
+    while (true) {
+        if (pos >= end) {
+            throw Error("unexpected EOF reading varint");
+        }
+        uint8_t b = static_cast<uint8_t>(*pos++);
+        if (shift >= 64) {
+            throw Error("varint overflow");
+        }
+        result |= static_cast<uint64_t>(b & 0x7f) << shift;
+        if ((b & 0x80) == 0) {
+            return result;
+        }
+        shift += 7;
+    }
+}
+inline int64_t bin_read_ivarint(const char*& pos, const char* end) {
+    return bin_zigzag_decode(bin_read_uvarint(pos, end));
+}
+
 template <typename T>
 inline std::enable_if_t<std::is_arithmetic_v<T>, void>
 dump_bin_value(std::string& buf, const T& v) {
     if constexpr (std::is_same_v<T, bool>) {
         buf.push_back(v ? 1 : 0);
-    } else {
+    } else if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
         buf.append(reinterpret_cast<const char*>(&v), sizeof(T));
+    } else if constexpr (std::is_floating_point_v<T>) {
+        buf.append(reinterpret_cast<const char*>(&v), sizeof(T));
+    } else if constexpr (std::is_signed_v<T>) {
+        bin_write_ivarint(buf, static_cast<int64_t>(v));
+    } else {
+        bin_write_uvarint(buf, static_cast<uint64_t>(v));
     }
 }
 
@@ -1283,46 +1330,49 @@ load_bin_value(const char*& pos, const char* end, T& out) {
     if constexpr (std::is_same_v<T, bool>) {
         out = (*pos != 0);
         pos += 1;
-    } else {
+    } else if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>) {
         std::memcpy(&out, pos, sizeof(T));
         pos += sizeof(T);
+    } else if constexpr (std::is_floating_point_v<T>) {
+        std::memcpy(&out, pos, sizeof(T));
+        pos += sizeof(T);
+    } else if constexpr (std::is_signed_v<T>) {
+        out = static_cast<T>(bin_read_ivarint(pos, end));
+    } else {
+        out = static_cast<T>(bin_read_uvarint(pos, end));
     }
 }
 
 inline void dump_bin_value(std::string& buf, const std::string& v) {
-    uint32_t len = v.size();
-    buf.append(reinterpret_cast<const char*>(&len), 4);
+    bin_write_uvarint(buf, v.size());
     buf.append(v);
 }
 
 inline void dump_bin_value(std::string& buf, std::string_view v) {
-    uint32_t len = v.size();
-    buf.append(reinterpret_cast<const char*>(&len), 4);
+    bin_write_uvarint(buf, v.size());
     buf.append(v);
 }
 
 inline void load_bin_value(const char*& pos, const char* end, std::string& out) {
-    uint32_t len;
-    std::memcpy(&len, pos, 4);
-    pos += 4;
+    uint64_t len = bin_read_uvarint(pos, end);
     out.assign(pos, len);
     pos += len;
 }
 
 inline void load_bin_value(const char*& pos, const char* end, std::string_view& out) {
-    uint32_t len;
-    std::memcpy(&len, pos, 4);
-    pos += 4;
+    uint64_t len = bin_read_uvarint(pos, end);
     out = std::string_view(pos, len);
     pos += len;
 }
 
 template <typename T>
 inline void dump_bin_value(std::string& buf, const std::vector<T>& v) {
-    uint32_t len = v.size();
-    buf.append(reinterpret_cast<const char*>(&len), 4);
-    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
-        buf.append(reinterpret_cast<const char*>(v.data()), len * sizeof(T));
+    bin_write_uvarint(buf, v.size());
+    if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t> ||
+                   std::is_floating_point_v<T>) &&
+                  !std::is_same_v<T, bool>) {
+        // Fixed-width elements (i8/u8/floats) keep the contiguous fast path.
+        buf.append(reinterpret_cast<const char*>(v.data()), v.size() * sizeof(T));
     } else {
         for (const auto& item : v) {
             dump_bin_value(buf, item);
@@ -1332,15 +1382,15 @@ inline void dump_bin_value(std::string& buf, const std::vector<T>& v) {
 
 template <typename T>
 inline void load_bin_value(const char*& pos, const char* end, std::vector<T>& out) {
-    uint32_t len;
-    std::memcpy(&len, pos, 4);
-    pos += 4;
+    uint64_t len = bin_read_uvarint(pos, end);
     out.resize(len);
-    if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
+    if constexpr ((std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t> ||
+                   std::is_floating_point_v<T>) &&
+                  !std::is_same_v<T, bool>) {
         std::memcpy(out.data(), pos, len * sizeof(T));
         pos += len * sizeof(T);
     } else {
-        for (uint32_t i = 0; i < len; i++) {
+        for (uint64_t i = 0; i < len; i++) {
             load_bin_value(pos, end, out[i]);
         }
     }
