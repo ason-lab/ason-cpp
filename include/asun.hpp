@@ -36,6 +36,7 @@
 #include <tuple>
 #include <charconv>
 #include <algorithm>
+#include <limits>
 
 // SIMD headers
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -290,10 +291,11 @@ inline void append_i64(std::string& buf, int64_t v) {
 
 inline void append_f64(std::string& buf, double v) {
     if (std::isnan(v) || std::isinf(v)) { buf.push_back('0'); return; }
-    // Integer-valued float
+    // Integer-valued float. Guard on signbit so -0.0 keeps its sign (the
+    // fast path below would otherwise emit "0.0").
     double intpart;
     double frac = std::modf(v, &intpart);
-    if (frac == 0.0) {
+    if (frac == 0.0 && !std::signbit(v)) {
         auto iv = static_cast<int64_t>(v);
         if (static_cast<double>(iv) == v) {
             append_i64(buf, iv);
@@ -301,35 +303,9 @@ inline void append_f64(std::string& buf, double v) {
             return;
         }
     }
-    // Fast path: 1 decimal place
-    double v10 = v * 10.0;
-    double frac10 = v10 - std::trunc(v10);
-    if (frac10 == 0.0 && std::abs(v10) < 1e18) {
-        auto vi = static_cast<int64_t>(v10);
-        if (vi < 0) { buf.push_back('-'); vi = -vi; }
-        auto ip = static_cast<uint64_t>(vi) / 10;
-        auto fp = static_cast<uint8_t>(static_cast<uint64_t>(vi) % 10);
-        append_u64(buf, ip);
-        buf.push_back('.');
-        buf.push_back('0' + fp);
-        return;
-    }
-    // Fast path: 2 decimal places
-    double v100 = v * 100.0;
-    double frac100 = v100 - std::trunc(v100);
-    if (frac100 == 0.0 && std::abs(v100) < 1e18) {
-        auto vi = static_cast<int64_t>(v100);
-        if (vi < 0) { buf.push_back('-'); vi = -vi; }
-        auto ip = static_cast<uint64_t>(vi) / 100;
-        auto fi = static_cast<size_t>(static_cast<uint64_t>(vi) % 100);
-        append_u64(buf, ip);
-        buf.push_back('.');
-        buf.push_back(DEC_DIGITS[fi * 2]);
-        char d2 = DEC_DIGITS[fi * 2 + 1];
-        if (d2 != '0') buf.push_back(d2);
-        return;
-    }
-    // General: use std::to_chars (faster than snprintf)
+    // General path: std::to_chars produces the shortest round-tripping form.
+    // (The former hand-rolled 1/2-decimal fast paths were not shortest and
+    // mishandled -0.0, so they are gone.)
     char tmp[32];
     auto [ptr, ec] = std::to_chars(tmp, tmp + sizeof(tmp), v);
     if (ec == std::errc()) {
@@ -620,6 +596,67 @@ inline bool is_delim(char c) {
     return c == ',' || c == ')' || c == ']' || c == '>' || c == ':' || c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
+// Parse exactly 4 hex digits at [p, p+4); throws on any non-hex digit or
+// short input. Returns the value; does NOT advance the caller's pointer.
+inline unsigned decode_hex4(const char* p, const char* end) {
+    if (p + 4 > end) throw Error("invalid unicode escape");
+    unsigned v = 0;
+    for (int i = 0; i < 4; i++) {
+        char c = p[i];
+        unsigned d;
+        if (c >= '0' && c <= '9') d = static_cast<unsigned>(c - '0');
+        else if (c >= 'a' && c <= 'f') d = static_cast<unsigned>(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') d = static_cast<unsigned>(c - 'A' + 10);
+        else throw Error("invalid unicode escape: non-hex digit");
+        v = (v << 4) | d;
+    }
+    return v;
+}
+
+inline void append_utf8(std::string& result, uint32_t cp) {
+    if (cp < 0x80) {
+        result.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        result.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        result.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        result.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+// Decode a \uXXXX escape (pos points just past the 'u'), appending the UTF-8
+// encoding to `result`. Handles UTF-16 surrogate pairs (\uD800-\uDBFF followed
+// by \uDC00-\uDFFF). Advances `pos` past all consumed hex digits. Throws on
+// malformed hex or an unpaired surrogate.
+inline void decode_unicode_escape(std::string& result, const char*& pos, const char* end) {
+    uint32_t cp = decode_hex4(pos, end);
+    pos += 4;
+    if (cp >= 0xD800 && cp <= 0xDBFF) {
+        // High surrogate — must be followed by \uDC00..\uDFFF.
+        if (pos + 2 <= end && pos[0] == '\\' && pos[1] == 'u') {
+            uint32_t lo = decode_hex4(pos + 2, end);
+            if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                pos += 6; // consumed "\uXXXX"
+            } else {
+                throw Error("invalid unicode escape: unpaired high surrogate");
+            }
+        } else {
+            throw Error("invalid unicode escape: unpaired high surrogate");
+        }
+    } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+        throw Error("invalid unicode escape: lone low surrogate");
+    }
+    append_utf8(result, cp);
+}
+
 // Parse quoted string into `result` — handles escape sequences;
 // zero-copy assign when no escapes. Reuses `result`'s existing buffer
 // (saves the temp+move pair in the typical hot path).
@@ -673,21 +710,7 @@ inline void parse_quoted_string_into(std::string& result, const char*& pos, cons
                 case '>':  result.push_back('>'); break;
                 case ':':  result.push_back(':'); break;
                 case 'u': {
-                    if (pos + 4 > end) throw Error("invalid unicode escape");
-                    char hex[5] = {pos[0], pos[1], pos[2], pos[3], 0};
-                    unsigned long cp = std::strtoul(hex, nullptr, 16);
-                    // Simple UTF-8 encode
-                    if (cp < 0x80) {
-                        result.push_back(static_cast<char>(cp));
-                    } else if (cp < 0x800) {
-                        result.push_back(static_cast<char>(0xC0 | (cp >> 6)));
-                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-                    } else {
-                        result.push_back(static_cast<char>(0xE0 | (cp >> 12)));
-                        result.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-                        result.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
-                    }
-                    pos += 4;
+                    decode_unicode_escape(result, pos, end);
                     break;
                 }
                 default: throw Error(std::string("invalid escape: \\") + esc);
@@ -946,7 +969,11 @@ struct ParsedSchema {
     int count = 0;
 };
 
-inline ParsedSchema parse_schema(const char*& pos, const char* end);
+// Maximum schema-annotation nesting depth; guards against stack overflow from
+// untrusted deeply-nested input (@{...@{...}} / @[{...}]).
+static constexpr int MAX_SCHEMA_DEPTH = 128;
+
+inline ParsedSchema parse_schema(const char*& pos, const char* end, int depth = 0);
 
 inline void validate_schema_scalar_type(const char*& pos, const char* end) {
     const char* start = pos;
@@ -962,10 +989,11 @@ inline void validate_schema_scalar_type(const char*& pos, const char* end) {
     throw Error("unsupported schema type '" + token + "'; use int, str, float, or bool");
 }
 
-inline void validate_schema_annotation(const char*& pos, const char* end) {
+inline void validate_schema_annotation(const char*& pos, const char* end, int depth) {
+    if (depth > MAX_SCHEMA_DEPTH) throw Error("maximum schema nesting depth exceeded");
     if (pos >= end) throw Error("expected schema type after '@'");
     if (*pos == '{') {
-        (void)parse_schema(pos, end);
+        (void)parse_schema(pos, end, depth + 1);
         return;
     }
     if (*pos == '[') {
@@ -976,7 +1004,7 @@ inline void validate_schema_annotation(const char*& pos, const char* end) {
             return;
         }
         if (pos < end && *pos == '{') {
-            (void)parse_schema(pos, end);
+            (void)parse_schema(pos, end, depth + 1);
         } else {
             validate_schema_scalar_type(pos, end);
         }
@@ -990,7 +1018,8 @@ inline void validate_schema_annotation(const char*& pos, const char* end) {
 
 // Parse schema: {field1,field2,...} or {field1@type1,...}
 // Returns field names as string_views (zero-copy, no heap allocation).
-inline ParsedSchema parse_schema(const char*& pos, const char* end) {
+inline ParsedSchema parse_schema(const char*& pos, const char* end, int depth) {
+    if (depth > MAX_SCHEMA_DEPTH) throw Error("maximum schema nesting depth exceeded");
     if (pos >= end || *pos != '{') throw Error("expected '{'");
     pos++;
     ParsedSchema result;
@@ -1026,7 +1055,7 @@ inline ParsedSchema parse_schema(const char*& pos, const char* end) {
         if (pos < end && *pos == '@') {
             pos++;
             skip_whitespace(pos, end);
-            validate_schema_annotation(pos, end);
+            validate_schema_annotation(pos, end, depth + 1);
         }
     }
     return result;
@@ -1133,25 +1162,42 @@ inline void load_value(const char*& pos, const char* end, double& out) {
 }
 
 inline void load_value(const char*& pos, const char* end, int8_t& out) {
-    int64_t v; load_value(pos, end, v); out = static_cast<int8_t>(v);
+    int64_t v; load_value(pos, end, v);
+    if (v < INT8_MIN || v > INT8_MAX) throw Error("integer out of range for i8");
+    out = static_cast<int8_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, int16_t& out) {
-    int64_t v; load_value(pos, end, v); out = static_cast<int16_t>(v);
+    int64_t v; load_value(pos, end, v);
+    if (v < INT16_MIN || v > INT16_MAX) throw Error("integer out of range for i16");
+    out = static_cast<int16_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, int32_t& out) {
-    int64_t v; load_value(pos, end, v); out = static_cast<int32_t>(v);
+    int64_t v; load_value(pos, end, v);
+    if (v < INT32_MIN || v > INT32_MAX) throw Error("integer out of range for i32");
+    out = static_cast<int32_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, uint8_t& out) {
-    uint64_t v; load_value(pos, end, v); out = static_cast<uint8_t>(v);
+    uint64_t v; load_value(pos, end, v);
+    if (v > UINT8_MAX) throw Error("integer out of range for u8");
+    out = static_cast<uint8_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, uint16_t& out) {
-    uint64_t v; load_value(pos, end, v); out = static_cast<uint16_t>(v);
+    uint64_t v; load_value(pos, end, v);
+    if (v > UINT16_MAX) throw Error("integer out of range for u16");
+    out = static_cast<uint16_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, uint32_t& out) {
-    uint64_t v; load_value(pos, end, v); out = static_cast<uint32_t>(v);
+    uint64_t v; load_value(pos, end, v);
+    if (v > UINT32_MAX) throw Error("integer out of range for u32");
+    out = static_cast<uint32_t>(v);
 }
 inline void load_value(const char*& pos, const char* end, float& out) {
-    double v; load_value(pos, end, v); out = static_cast<float>(v);
+    double v; load_value(pos, end, v);
+    // Reject values whose magnitude overflows float (would silently become
+    // +/-inf on narrowing). Underflow to a subnormal/zero is acceptable.
+    if (std::abs(v) > static_cast<double>(std::numeric_limits<float>::max()))
+        throw Error("float out of range for f32");
+    out = static_cast<float>(v);
 }
 
 inline void load_value(const char*& pos, const char* end, char& out) {
